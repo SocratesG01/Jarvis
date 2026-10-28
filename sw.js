@@ -2,7 +2,7 @@
 // photos are cached here after they've been seen once.
 const VERSION = "jarvis-v1";
 const SHELL = ["./", "index.html", "style.css", "app.js", "data.js", "config.js", "manifest.webmanifest", "icons/icon.svg", "icons/icon-192.png",
-  "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm"];
+  "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/+esm"];
 
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", (e) => { e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });

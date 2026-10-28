@@ -17,10 +17,9 @@ const client = new Anthropic({ apiKey: Deno.env.get("ANTHROPIC_API_KEY") });
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
-    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
-    });
-    const { data: { user } } = await supabase.auth.getUser();
+    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? "");
+    const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+    const { data: { user } } = await supabase.auth.getUser(token);
     const allowed = Deno.env.get("ALLOWED_EMAIL");
     if (!user || (allowed && user.email?.toLowerCase() !== allowed.toLowerCase())) return json({ error: "not_allowed" }, 403);
 

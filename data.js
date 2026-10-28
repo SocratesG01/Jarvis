@@ -2,7 +2,7 @@
    db.collection(c).onSnapshot / .doc(id).set|update|delete, db.doc("c/id").
    Everything is cached in memory and in localStorage, so the app opens and reads
    offline; writes made offline are queued and sent when the connection returns. */
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/+esm";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
 
 export const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
