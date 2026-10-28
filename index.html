@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Jarvis Field Book</title>
-<meta name="theme-color" content="#0F4A40">
+<meta name="theme-color" content="#050E1A">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Jarvis">
@@ -12,7 +12,7 @@
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Orbitron:wght@600;700;800&family=IBM+Plex+Mono:wght@500&display=swap">
 <link rel="stylesheet" href="style.css">
 <style>
 html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
@@ -22,24 +22,44 @@ img { max-width: 100%; }
 </style>
 </head>
 <body>
-<div id="login" class="login" hidden>
-  <div class="login-art"><svg class="acropolis" viewBox="0 0 240 120" aria-hidden="true"><path d="M0 118c30-14 60-20 120-20s90 6 120 20"/><path d="M28 98h184M36 92h168M44 86h152"/><path d="M58 86V46M75 86V46M92 86V46M109 86V46M126 86V46M143 86V46M160 86V46M177 86V46"/><path d="M50 46h140M48 40h144M54 40l66-24 66 24"/></svg><img class="login-logo" src="icons/icon.svg" alt="" width="72" height="72"></div>
-  <h1>Jarvis</h1>
-  <span class="eyebrow">Ο βοηθός σου στις πωλήσεις</span>
-  <p class="muted">Συνδέσου για να δεις τα μαγαζιά σου. Τα δεδομένα σου είναι ιδιωτικά.</p>
-  <form id="login-form" class="panel inline-form">
-    <label class="field">Email<input id="login-email" type="email" autocomplete="username" required></label>
-    <label class="field">Κωδικός<input id="login-pass" type="password" autocomplete="current-password" minlength="8" required></label>
-    <div class="row-actions"><button class="btn primary" type="submit" id="login-go">Σύνδεση</button><button class="btn" type="button" id="signup-go">Νέος λογαριασμός</button></div>
-    <p class="muted small" id="login-msg" role="status"></p>
-  </form>
+<div id="login" class="welcome login-screen" hidden>
+  <div class="wl-glow" aria-hidden="true"></div>
+  <svg class="wl-acropolis" viewBox="0 0 240 130" aria-hidden="true"><path pathLength="1" d="M0 126c30-14 60-20 120-20s90 6 120 20"/><path pathLength="1" d="M28 104h184M36 98h168M44 92h152"/><path pathLength="1" d="M58 92V50M75 92V50M92 92V50M109 92V50M126 92V50M143 92V50M160 92V50M177 92V50"/><path pathLength="1" d="M50 50h140M48 44h144M54 44l66-26 66 26"/><path pathLength="1" d="M120 18V8M116 8h8"/></svg>
+  <div class="wl-brand wl-in" style="--d:.1s"><svg class="arc wl-arc" viewBox="0 0 64 64" aria-hidden="true"><defs><radialGradient id="arcg-wl"><stop offset="0" stop-color="#F0FDFF"/><stop offset=".4" stop-color="#67E8F9"/><stop offset="1" stop-color="#0891B2" stop-opacity="0"/></radialGradient></defs><circle cx="32" cy="32" r="30" fill="#04121F" stroke="#22D3EE" stroke-opacity=".55" stroke-width="1.5"/><g class="arc-spin"><circle cx="32" cy="32" r="24" fill="none" stroke="#22D3EE" stroke-width="3.2" stroke-dasharray="5.5 3.2"/></g><circle cx="32" cy="32" r="18" fill="none" stroke="#67E8F9" stroke-opacity=".8" stroke-width="1.6"/><g class="arc-spin rev"><path d="M32 16v5M32 43v5M16 32h5M43 32h5M20.7 20.7l3.5 3.5M39.8 39.8l3.5 3.5M43.3 20.7l-3.5 3.5M24.2 39.8l-3.5 3.5" stroke="#A5F3FC" stroke-width="1.6" stroke-linecap="round"/></g><circle cx="32" cy="32" r="13" fill="url(#arcg-wl)"/></svg><span class="wl-word">J.A.R.V.I.S.<small>Ο βοηθός πωλήσεών σου</small></span></div>
+  <div class="wl-mid">
+    <h1 class="wl-in" style="--d:.25s">Καλώς ήρθες</h1>
+    <p class="wl-sub wl-in" style="--d:.35s">Ο βοηθός σου για τα μαγαζιά, τις επισκέψεις και την αγορά. Συνδέσου για να συνεχίσεις.</p>
+    <form id="login-form" class="wl-card wl-form wl-in" style="--d:.45s">
+      <label class="field">Email<input id="login-email" type="email" autocomplete="username" required></label>
+      <label class="field">Κωδικός<input id="login-pass" type="password" autocomplete="current-password" minlength="8" required></label>
+      <button class="wl-btn primary" type="submit" id="login-go">Σύνδεση</button>
+      <button class="wl-link" type="button" id="signup-go">Νέος λογαριασμός</button>
+      <p class="small" id="login-msg" role="status"></p>
+    </form>
+  </div>
+</div>
+<div id="welcome" class="welcome" hidden>
+  <div class="wl-glow" aria-hidden="true"></div>
+  <svg class="wl-acropolis" viewBox="0 0 240 130" aria-hidden="true"><path pathLength="1" d="M0 126c30-14 60-20 120-20s90 6 120 20"/><path pathLength="1" d="M28 104h184M36 98h168M44 92h152"/><path pathLength="1" d="M58 92V50M75 92V50M92 92V50M109 92V50M126 92V50M143 92V50M160 92V50M177 92V50"/><path pathLength="1" d="M50 50h140M48 44h144M54 44l66-26 66 26"/><path pathLength="1" d="M120 18V8M116 8h8"/></svg>
+  <div class="wl-brand wl-in" style="--d:.1s"><svg class="arc wl-arc" viewBox="0 0 64 64" aria-hidden="true"><defs><radialGradient id="arcg-wl2"><stop offset="0" stop-color="#F0FDFF"/><stop offset=".4" stop-color="#67E8F9"/><stop offset="1" stop-color="#0891B2" stop-opacity="0"/></radialGradient></defs><circle cx="32" cy="32" r="30" fill="#04121F" stroke="#22D3EE" stroke-opacity=".55" stroke-width="1.5"/><g class="arc-spin"><circle cx="32" cy="32" r="24" fill="none" stroke="#22D3EE" stroke-width="3.2" stroke-dasharray="5.5 3.2"/></g><circle cx="32" cy="32" r="18" fill="none" stroke="#67E8F9" stroke-opacity=".8" stroke-width="1.6"/><g class="arc-spin rev"><path d="M32 16v5M32 43v5M16 32h5M43 32h5M20.7 20.7l3.5 3.5M39.8 39.8l3.5 3.5M43.3 20.7l-3.5 3.5M24.2 39.8l-3.5 3.5" stroke="#A5F3FC" stroke-width="1.6" stroke-linecap="round"/></g><circle cx="32" cy="32" r="13" fill="url(#arcg-wl2)"/></svg><span class="wl-word">J.A.R.V.I.S.<small>Ο βοηθός πωλήσεών σου</small></span></div>
+  <div class="wl-mid">
+    <span class="wl-date wl-in" style="--d:.2s" id="wl-date"></span>
+    <h1 class="wl-in" style="--d:.3s" id="wl-greet">Καλώς ήρθες</h1>
+    <p class="wl-sub wl-in" style="--d:.4s" id="wl-sub">Ο βοηθός σου για τα μαγαζιά της Αθήνας.</p>
+    <div class="wl-cards wl-in" style="--d:.55s" id="wl-cards"></div>
+    <p class="wl-tip wl-in" style="--d:.7s" id="wl-tip"></p>
+  </div>
+  <div class="wl-actions wl-in" style="--d:.8s">
+    <button class="wl-btn primary" type="button" data-wl="enter">Ξεκίνα τη μέρα <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+    <button class="wl-btn glass" type="button" data-wl="talk"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/><path d="M18 11a6 6 0 0 1-12 0M12 17v4"/></svg>Μίλα στον Jarvis</button>
+  </div>
 </div>
 <div id="shell" hidden>
 
 
 <header class="top"><div class="wrap">
   <button class="icon-btn hdr-back" id="hdr-back" data-action="back" aria-label="Πίσω" hidden><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
-  <div class="hdr-title"><span class="hdr-eyebrow" id="hdr-eyebrow"></span><span id="hdr-title">Jarvis</span></div>
+  <span class="hdr-logo" aria-hidden="true"><svg class="arc" viewBox="0 0 64 64" aria-hidden="true"><defs><radialGradient id="arcg-hdr"><stop offset="0" stop-color="#F0FDFF"/><stop offset=".4" stop-color="#67E8F9"/><stop offset="1" stop-color="#0891B2" stop-opacity="0"/></radialGradient></defs><circle cx="32" cy="32" r="30" fill="#04121F" stroke="#22D3EE" stroke-opacity=".55" stroke-width="1.5"/><g class="arc-spin"><circle cx="32" cy="32" r="24" fill="none" stroke="#22D3EE" stroke-width="3.2" stroke-dasharray="5.5 3.2"/></g><circle cx="32" cy="32" r="18" fill="none" stroke="#67E8F9" stroke-opacity=".8" stroke-width="1.6"/><g class="arc-spin rev"><path d="M32 16v5M32 43v5M16 32h5M43 32h5M20.7 20.7l3.5 3.5M39.8 39.8l3.5 3.5M43.3 20.7l-3.5 3.5M24.2 39.8l-3.5 3.5" stroke="#A5F3FC" stroke-width="1.6" stroke-linecap="round"/></g><circle cx="32" cy="32" r="13" fill="url(#arcg-hdr)"/></svg></span><div class="hdr-title"><span class="hdr-eyebrow" id="hdr-eyebrow"></span><span id="hdr-title">Jarvis</span></div>
   <div class="hdr-right"><span id="hdr-actions"></span><span id="sync-dot" title="Συγχρονισμένο"></span></div>
 </div></header>
 

@@ -94,6 +94,7 @@ function openShop(id, opts = {}) { Object.assign(state, { reading: null, shopId:
 function openCat(id) { Object.assign(state, { reading: null, catId: id, shopId: null, editing: false, armed: null, dirty: false }); render(); window.scrollTo(0, 0); }
 function routeFromHash() { const h = location.hash.slice(1); go(PAGES.includes(h) ? h : "today"); }
 window.addEventListener("hashchange", routeFromHash);
+document.querySelector("nav.tabs").addEventListener("click", (ev) => { const a = ev.target.closest("a[data-tab]"); if (a && location.hash.slice(1) === a.dataset.tab) { ev.preventDefault(); go(a.dataset.tab); } });
 
 /* ---------- shared bits ---------- */
 const ic = (d) => `<svg viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
@@ -136,6 +137,28 @@ const art = (k) => `<svg class="art" viewBox="0 0 64 64" aria-hidden="true">${AR
 const emptyLi = (k, text) => `<li class="empty art-row">${art(k)}<span>${text}</span></li>`;
 const emptyDiv = (k, text) => `<div class="empty art-row">${art(k)}<span>${text}</span></div>`;
 const ACROPOLIS = `<svg class="acropolis" viewBox="0 0 240 120" aria-hidden="true"><path d="M0 118c30-14 60-20 120-20s90 6 120 20"/><path d="M28 98h184M36 92h168M44 86h152"/><path d="M58 86V46M75 86V46M92 86V46M109 86V46M126 86V46M143 86V46M160 86V46M177 86V46"/><path d="M50 46h140M48 40h144M54 40l66-24 66 24"/><path d="M64 30l-2-8M176 30l2-8"/></svg>`;
+let arcN = 0;
+const arcLogo = (cls = "arc") => { const id = "arcg" + (arcN++); return `<svg class="${cls}" viewBox="0 0 64 64" aria-hidden="true"><defs><radialGradient id="${id}"><stop offset="0" stop-color="#F0FDFF"/><stop offset=".4" stop-color="#67E8F9"/><stop offset="1" stop-color="#0891B2" stop-opacity="0"/></radialGradient></defs><circle cx="32" cy="32" r="30" fill="#04121F" stroke="#22D3EE" stroke-opacity=".55" stroke-width="1.5"/><g class="arc-spin"><circle cx="32" cy="32" r="24" fill="none" stroke="#22D3EE" stroke-width="3.2" stroke-dasharray="5.5 3.2"/></g><circle cx="32" cy="32" r="18" fill="none" stroke="#67E8F9" stroke-opacity=".8" stroke-width="1.6"/><g class="arc-spin rev"><path d="M32 16v5M32 43v5M16 32h5M43 32h5M20.7 20.7l3.5 3.5M39.8 39.8l3.5 3.5M43.3 20.7l-3.5 3.5M24.2 39.8l-3.5 3.5" stroke="#A5F3FC" stroke-width="1.6" stroke-linecap="round"/></g><circle cx="32" cy="32" r="13" fill="url(#${id})"/></svg>`; };
+/* night view of the Acropolis for the Home header (decorative, drawn in code) */
+const NIGHT = (() => {
+  let seed = 7; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+  const stars = Array.from({ length: 26 }, () => `<circle cx="${(rnd() * 400).toFixed(1)}" cy="${(rnd() * 70).toFixed(1)}" r="${(rnd() * 0.9 + 0.3).toFixed(2)}" fill="#CFEFFF" opacity="${(rnd() * 0.6 + 0.2).toFixed(2)}"/>`).join("");
+  const lights = Array.from({ length: 170 }, () => { const x = rnd() * 400, y = 168 + rnd() * 52; const warm = rnd() > 0.35; return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(rnd() * 0.9 + 0.35).toFixed(2)}" fill="${warm ? "#FBBF5A" : "#7DD3FC"}" opacity="${(rnd() * 0.6 + 0.35).toFixed(2)}"/>`; }).join("");
+  const cols = Array.from({ length: 8 }, (_, i) => `<rect x="${(239 + i * 10.6).toFixed(1)}" y="98" width="5.2" height="30" rx="1" fill="url(#ng-gold)"/>`).join("");
+  return `<svg class="night" viewBox="0 0 400 220" preserveAspectRatio="xMaxYMid slice" aria-hidden="true">
+  <defs><linearGradient id="ng-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0A2540"/><stop offset="1" stop-color="#071628"/></linearGradient>
+  <linearGradient id="ng-gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE3A3"/><stop offset="1" stop-color="#D08A2B"/></linearGradient>
+  <radialGradient id="ng-glow"><stop offset="0" stop-color="#F7B955" stop-opacity=".55"/><stop offset="1" stop-color="#F7B955" stop-opacity="0"/></radialGradient>
+  <linearGradient id="ng-rock" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3B3326"/><stop offset="1" stop-color="#0D1B2A"/></linearGradient></defs>
+  <rect width="400" height="220" fill="url(#ng-sky)"/>${stars}
+  <path d="M0 150 C60 128 110 140 160 132 S250 118 300 126 S370 120 400 128 V220 H0Z" fill="#0B1E33"/>
+  <ellipse cx="282" cy="112" rx="90" ry="46" fill="url(#ng-glow)"/>
+  <path d="M170 168 C190 150 205 138 222 132 L232 129 H340 L352 134 C366 142 380 156 396 170Z" fill="url(#ng-rock)"/>
+  <rect x="232" y="127" width="106" height="4" rx="1" fill="#E7A94B"/><rect x="236" y="123" width="98" height="4" rx="1" fill="#F2C373"/>${cols}
+  <rect x="234" y="92" width="102" height="6" rx="1" fill="url(#ng-gold)"/><path d="M236 92 L285 78 L334 92Z" fill="#E9B160"/>
+  <path d="M0 172 C80 160 160 176 240 166 S360 162 400 168 V220 H0Z" fill="#081726"/>${lights}
+</svg>`;
+})();
 const shopAvatar = (s, cls = "ph") => { const icon = TYPE_ICON[s.type]; return icon ? `<span class="${cls} av type" style="--h:${hue(s.area || s.name)}" aria-hidden="true">${icon}</span>` : avatar(s.name, cls); };
 const iconBtn = (action, label, icon, v = "") => `<button class="icon-btn" data-action="${action}" ${v ? `data-v="${v}"` : ""} aria-label="${esc(label)}" title="${esc(label)}">${icon}</button>`;
 const hue = (t) => [...String(t || "?")].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 17);
@@ -199,35 +222,120 @@ function adder(form, summary, fields, submit, open = false) {
 }
 
 /* ---------- views: today ---------- */
+const WEATHER = { 0: ["Αίθριος", "sun"], 1: ["Κυρίως αίθριος", "sun"], 2: ["Λίγα σύννεφα", "cloud-sun"], 3: ["Συννεφιά", "cloud"], 45: ["Ομίχλη", "cloud"], 48: ["Ομίχλη", "cloud"], 51: ["Ψιχάλες", "rain"], 53: ["Ψιχάλες", "rain"], 55: ["Ψιχάλες", "rain"], 61: ["Βροχή", "rain"], 63: ["Βροχή", "rain"], 65: ["Δυνατή βροχή", "rain"], 80: ["Μπόρες", "rain"], 81: ["Μπόρες", "rain"], 82: ["Μπόρες", "rain"], 95: ["Καταιγίδα", "rain"], 96: ["Καταιγίδα", "rain"], 99: ["Καταιγίδα", "rain"] };
+const WICON = {
+  sun: '<circle cx="12" cy="12" r="4.2" fill="#FBBF24" stroke="none"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M18.7 5.3l-1.8 1.8M7.1 16.9l-1.8 1.8" stroke="#FBBF24"/>',
+  "cloud-sun": '<circle cx="9" cy="9" r="3.4" fill="#FBBF24" stroke="none"/><path d="M8 19h9a3.5 3.5 0 0 0 0-7 5 5 0 0 0-9.5 1.5A2.8 2.8 0 0 0 8 19z" fill="#CBD5E1" stroke="none"/>',
+  cloud: '<path d="M7 18h10a4 4 0 0 0 0-8 6 6 0 0 0-11.4 1.8A3.2 3.2 0 0 0 7 18z" fill="#CBD5E1" stroke="none"/>',
+  rain: '<path d="M7 15h10a4 4 0 0 0 0-8 6 6 0 0 0-11.4 1.8A3.2 3.2 0 0 0 7 15z" fill="#CBD5E1" stroke="none"/><path d="M9 18l-1 3M13 18l-1 3M17 18l-1 3" stroke="#60A5FA"/>',
+};
+async function loadWeather() {
+  if (state.weatherAt && Date.now() - state.weatherAt < 30 * 60000) return;
+  state.weatherAt = Date.now();
+  const at = state.here || { lat: 37.9755, lng: 23.7348 };
+  try {
+    const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${at.lat.toFixed(3)}&longitude=${at.lng.toFixed(3)}&current=temperature_2m,weather_code&timezone=auto`);
+    const j = await r.json();
+    state.weather = { t: Math.round(j.current.temperature_2m), code: j.current.weather_code };
+    const el = document.getElementById("jx-weather"); if (el) el.outerHTML = weatherHtml();
+  } catch { state.weatherAt = 0; }
+}
+function weatherHtml() {
+  const w = state.weather; const [label, icon] = w ? (WEATHER[w.code] || ["", "cloud"]) : ["", "sun"];
+  return `<span class="jx-weather" id="jx-weather" title="${esc(label)}"><svg viewBox="0 0 24 24" aria-hidden="true" stroke-width="1.8" stroke-linecap="round">${WICON[icon]}</svg><span><b>${w ? w.t + "°C" : "–°C"}</b><small>Αθήνα</small></span></span>`;
+}
+const clockText = () => new Date().toLocaleTimeString("el-GR", { hour: "2-digit", minute: "2-digit" });
+setInterval(() => { const el = document.getElementById("jx-time"); if (el) el.textContent = clockText(); }, 20000);
+
+/* Athens reference places for the territory map */
+const PLACES = [["Αθήνα", 37.9755, 23.7348, 1], ["Πειραιάς", 37.9420, 23.6465, 1], ["Γλυφάδα", 37.8625, 23.7540, 1], ["Κηφισιά", 38.0740, 23.8110, 1], ["Μαρούσι", 38.0500, 23.8060, 1], ["Περιστέρι", 38.0130, 23.6900, 0], ["Χαλάνδρι", 38.0210, 23.7990, 0], ["Καλλιθέα", 37.9550, 23.7020, 0], ["Ν. Σμύρνη", 37.9450, 23.7140, 0],
+  ["Πλάκα", 37.9715, 23.7300, 2], ["Μοναστηράκι", 37.9762, 23.7255, 2], ["Θησείο", 37.9767, 23.7190, 2], ["Ψυρρή", 37.9788, 23.7238, 2], ["Κουκάκι", 37.9645, 23.7235, 2], ["Κολωνάκι", 37.9790, 23.7430, 2], ["Σύνταγμα", 37.9755, 23.7348, 2], ["Εξάρχεια", 37.9866, 23.7339, 2], ["Γκάζι", 37.9783, 23.7120, 2], ["Παγκράτι", 37.9686, 23.7470, 2]];
+function territoryMap() {
+  const geo = state.shops.filter(hasGeo);
+  const W = 340, H = 190;
+  let minLat = 37.955, maxLat = 37.995, minLng = 23.700, maxLng = 23.760;
+  geo.forEach((s) => { minLat = Math.min(minLat, s.lat); maxLat = Math.max(maxLat, s.lat); minLng = Math.min(minLng, s.lng); maxLng = Math.max(maxLng, s.lng); });
+  const k = Math.cos(((minLat + maxLat) / 2) * Math.PI / 180);
+  let spanX = (maxLng - minLng) * k, spanY = maxLat - minLat;
+  const want = W / H; if (spanX / spanY < want) { const d = (spanY * want - spanX) / k / 2; minLng -= d; maxLng += d; spanX = (maxLng - minLng) * k; } else { const d = (spanX / want - spanY) / 2; minLat -= d; maxLat += d; spanY = maxLat - minLat; }
+  const pad = 0.12; minLat -= spanY * pad; maxLat += spanY * pad; minLng -= spanX * pad / k; maxLng += spanX * pad / k; spanX *= 1 + 2 * pad; spanY *= 1 + 2 * pad;
+  const xy = (lat, lng) => [((lng - minLng) * k) / spanX * W, (maxLat - lat) / spanY * H];
+  const zoomedIn = spanY < 0.08;
+  const places = PLACES.filter(([, lat, lng, lvl]) => (zoomedIn ? lvl !== 0 : lvl !== 2) && lat > minLat && lat < maxLat && lng > minLng && lng < maxLng).map(([n, lat, lng]) => [n, ...xy(lat, lng)])
+    .reduce((kept, p) => { const box = [p[1] - 3, p[2] - 8, p[1] + 8 + p[0].length * 4.8, p[2] + 6]; if (!kept.some((q) => box[0] < q.box[2] && q.box[0] < box[2] && box[1] < q.box[3] && q.box[1] < box[3])) kept.push(Object.assign(p, { box })); return kept; }, []);
+  let seed = 3; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+  const [cx, cy] = xy(37.9755, 23.7348);
+  const roads = Array.from({ length: 34 }, (_, i) => { const a = (i / 34) * Math.PI * 2 + rnd() * 0.3, r1 = 8 + rnd() * 30, r2 = 120 + rnd() * 160; return `<path d="M${(cx + Math.cos(a) * r1).toFixed(0)} ${(cy + Math.sin(a) * r1).toFixed(0)} Q${(cx + Math.cos(a + 0.25) * r2 * 0.5).toFixed(0)} ${(cy + Math.sin(a + 0.25) * r2 * 0.5).toFixed(0)} ${(cx + Math.cos(a) * r2).toFixed(0)} ${(cy + Math.sin(a) * r2).toFixed(0)}"/>`; }).join("")
+    + Array.from({ length: 5 }, (_, i) => `<circle cx="${cx.toFixed(0)}" cy="${cy.toFixed(0)}" r="${24 + i * 26}"/>`).join("");
+  const sea = [[37.80, 23.55], [37.95, 23.55], [37.948, 23.62], [37.937, 23.655], [37.932, 23.69], [37.915, 23.70], [37.89, 23.725], [37.865, 23.745], [37.85, 23.77], [37.80, 23.80]].map(([a, b]) => xy(a, b).map((v) => v.toFixed(0)).join(",")).join(" ");
+  const dots = geo.map((s) => { const [x, y] = xy(s.lat, s.lng); return `<g class="tm-dot ${esc(s.status)}"><circle class="halo" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="9"/><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.6"/></g>`; }).join("");
+  const labels = places.map(([n, x, y]) => `<text x="${(x + 6).toFixed(0)}" y="${(y + 4).toFixed(0)}">${esc(n)}</text><circle class="tm-place" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="1.8"/>`).join("");
+  return `<svg class="tm" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><polygon class="tm-sea" points="${sea}"/><g class="tm-roads">${roads}</g>${labels}${dots}</svg>`;
+}
+function jarvisSuggestion() {
+  const t = todayISO();
+  const hot = state.shops.filter((s) => s.status === "prospect" && (scoreOf(s) ?? 0) >= 60 && (!s.lastVisit || daysSinceVisit(s) >= 14)).sort((a, b) => scoreOf(b) - scoreOf(a))[0];
+  if (hot) return { id: hot.id, text: `Το ${hot.name} είναι υποψήφιος υψηλής αξίας (${scoreOf(hot)}/100). Κλείσε μια επίσκεψη αυτή την εβδομάδα.` };
+  const quiet = state.shops.filter(isQuiet).sort((a, b) => (a.lastVisit || "").localeCompare(b.lastVisit || ""))[0];
+  if (quiet) return { id: quiet.id, text: quiet.lastVisit ? `Το ${quiet.name} δεν έχει επίσκεψη εδώ και ${daysSinceVisit(quiet)} μέρες. Μια γρήγορη στάση κρατάει τη σχέση ζεστή.` : `Το ${quiet.name} δεν έχει καμία επίσκεψη ακόμα. Πέρνα να γνωριστείτε.` };
+  const late = state.tasks.filter((x) => !x.done && x.due && x.due < t).sort((a, b) => a.due.localeCompare(b.due))[0];
+  if (late) return { id: late.shopId || "", text: `Έχεις εκπρόθεσμη εργασία: «${late.title}». Κλείσ' τη σήμερα.` };
+  return { id: "", text: "Όλα υπό έλεγχο. Πρόσθεσε νέους υποψήφιους στην περιοχή σου για να μεγαλώσεις το χαρτοφυλάκιο." };
+}
 function viewToday() {
   const t = todayISO();
+  loadWeather();
+  const name = state.settings.myName ?? "Σωκράτη";
   const open = state.tasks.filter((x) => !x.done);
-  const due = open.filter((x) => x.due && x.due <= t).sort((a, b) => a.due.localeCompare(b.due));
-  const in7 = state.shops.filter((s) => s.nextVisit && s.nextVisit >= t && daysBetween(t, s.nextVisit) <= 7).sort((a, b) => a.nextVisit.localeCompare(b.nextVisit));
-  const quiet = state.shops.filter(isQuiet).sort((a, b) => (a.lastVisit || "").localeCompare(b.lastVisit || ""));
-  const top = state.shops.filter((s) => s.status === "prospect").sort((a, b) => (scoreOf(b) ?? -1) - (scoreOf(a) ?? -1)).slice(0, 3);
-  const recent = state.visits.slice(0, 4);
-  const counts = { active: 0, prospect: 0, closed: 0 }; state.shops.forEach((s) => { if (counts[s.status] != null) counts[s.status]++; });
-  const stat = (n, label, action, v) => `<button class="hero-stat" data-action="${action}" data-v="${v}"><b>${n}</b><span>${label}</span></button>`;
-  const quick = (action, v, icon, label) => `<button class="quick-btn" data-action="${action}" ${v ? `data-v="${v}"` : ""}><span class="quick-ic">${icon}</span>${label}</button>`;
-  const head = (title, link) => `<div class="section-head"><h2>${title}</h2>${link || ""}</div>`;
+  const overdue = open.filter((x) => x.due && x.due < t);
+  const customers = state.shops.filter((s) => s.status === "active");
+  const weekAgo = addDays(t, -7);
+  const newThisWeek = state.shops.filter((s) => (s.createdAt || "").slice(0, 10) >= weekAgo).length;
+  const planned = state.shops.filter((s) => s.nextVisit === t);
+  const doneToday = state.visits.filter((v) => v.date === t);
+  const month = t.slice(0, 7), target = Number(state.settings.visitTarget) || 40;
+  const monthVisits = state.visits.filter((v) => (v.date || "").startsWith(month)).length;
+  const pct = Math.min(100, Math.round(monthVisits / target * 100));
+  const card = (action, v, icon, n, label, sub, extra = "") => `<button class="jx-stat" data-action="${action}" data-v="${v}"><span class="jx-ic">${icon}</span><b>${n}</b><span class="jx-label">${label}</span>${extra}<span class="jx-sub2">${sub}</span></button>`;
+  const todayTasks = open.filter((x) => x.due === t);
+  const rows = [
+    ...overdue.map((x) => ({ kind: "late", x })), ...planned.map((s) => ({ kind: "visit", s })), ...todayTasks.map((x) => ({ kind: "task", x })),
+  ].slice(0, 6);
+  const row = (r) => {
+    if (r.kind === "visit") return `<li><button class="jx-row" data-action="open" data-id="${esc(r.s.id)}"><i class="d visit"></i><span class="jx-when">Επίσκεψη</span><span class="jx-what"><b>${esc(r.s.name)}</b><small>${esc([tr(r.s.type), r.s.area].filter(Boolean).join(" · "))}</small></span><span class="chev">${ICON.chev}</span></button></li>`;
+    const sh = r.x.shopId ? shopById(r.x.shopId) : null;
+    return `<li><button class="jx-row" ${sh ? `data-action="open" data-id="${esc(sh.id)}"` : `data-action="go" data-v="agenda"`}><i class="d ${r.kind}"></i><span class="jx-when">${r.kind === "late" ? "Εκπρόθ." : "Εργασία"}</span><span class="jx-what"><b>${esc(r.x.title)}</b><small>${esc(sh ? sh.name : "Χωρίς μαγαζί")}</small></span><span class="chev">${ICON.chev}</span></button></li>`;
+  };
+  const sug = jarvisSuggestion();
+  const quiet = state.shops.filter(isQuiet).sort((a, b) => (a.lastVisit || "").localeCompare(b.lastVisit || "")).slice(0, 4);
   return `${banner()}
-  <section class="hero">${ACROPOLIS}
-    <p class="hero-line">${due.length ? `<b>${plural(due.length, "εργασία", "εργασίες")}</b> για σήμερα` : "Καμία εργασία για σήμερα"} · ${in7.length ? `<b>${plural(in7.length, "επίσκεψη", "επισκέψεις")}</b> αυτή την εβδομάδα` : "καμία επίσκεψη αυτή την εβδομάδα"}</p>
-    <div class="hero-stats">${stat(counts.active, "Πελάτες", "shop-filter", "active")}${stat(counts.prospect, "Υποψήφιοι", "go", "prospects")}${stat(new Set(state.shops.map(areaOf)).size, "Περιοχές", "shop-filter", "all")}${stat(counts.closed, "Έκλεισαν", "shop-filter", "closed")}</div>
+  <section class="jx-hero">${NIGHT}
+    <div class="jx-greet"><h1>${greeting()}${name ? `,<br><span class="jx-name">${esc(name)}.</span>` : ""}</h1>
+      <p class="jx-lead">Το χαρτοφυλάκιό σου στην Αθήνα είναι έτοιμο.</p>
+      <p class="jx-tag">Περισσότερες επισκέψεις. Δυνατότερες σχέσεις. Καλύτερα αποτελέσματα.</p></div>
+    <div class="jx-meta">${weatherHtml()}<span class="jx-sep"></span><span class="jx-clock"><small>${esc(new Date().toLocaleDateString("el-GR", { weekday: "short", day: "numeric", month: "short" }))}</small><b id="jx-time">${clockText()}</b></span></div>
   </section>
-  <div class="quick">${quick("talk", "", ICON.mic, "Αναφορά")}${canEdit() ? quick("new-shop", "", ICON.plus, "Νέο μαγαζί") : ""}${quick("near-go", "", ICON.locate, "Κοντά μου")}${quick("go", "map", ICON.map, "Χάρτης")}</div>
+  <div class="jx-stats">
+    ${card("shop-filter", "active", ic('<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0M16 5.5a3 3 0 0 1 0 6M18 19a5 5 0 0 0-2.5-4.3"/>'), customers.length, "Πελάτες", newThisWeek ? `<span class="up">▲ +${newThisWeek}</span> αυτή την εβδομάδα` : `${state.shops.length} μαγαζιά συνολικά`)}
+    ${card("go", "agenda", ic('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 14h2M12 14h2M16 14h0M8 17h2"/>'), planned.length + doneToday.length, "Σημερινές επισκέψεις", `${doneToday.length} ολοκληρώθηκαν`)}
+    ${card("go", "settings", ic('<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/><path d="M12 12l7-7M16 5h3v3"/>'), pct + "%", "Στόχος μήνα", `${monthVisits}/${target} επισκέψεις`, `<span class="jx-bar"><span style="width:${pct}%"></span></span>`)}
+    ${card("go", "agenda", ic('<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 12l2 2 4-4"/>'), open.length, "Εκκρεμότητες", overdue.length ? `<span class="warn">${overdue.length} εκπρόθεσμες</span>` : "όλες εντός χρόνου")}
+  </div>
+  <button class="jx-card jx-map" data-action="go" data-v="map">
+    ${territoryMap()}
+    <span class="jx-map-head"><span class="jx-pin">${ic('<path d="M12 21s-6.5-6-6.5-11.5a6.5 6.5 0 0 1 13 0C18.5 15 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.4"/>')}</span><span><b>Η περιοχή σου</b><small>Οι πελάτες σου. Η διαδρομή σου.</small></span><span class="chev">${ICON.chev}</span></span>
+    <span class="jx-map-btn">${ICON.map} Χάρτης</span>
+  </button>
+  <section class="jx-card jx-sched">
+    <div class="jx-sched-head"><span class="jx-ic">${ic('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 14h2M12 14h2M8 17h2"/>')}</span><span class="grow"><b>Σημερινό πρόγραμμα</b><small>${plural(planned.length, "επίσκεψη", "επισκέψεις")} · ${plural(todayTasks.length + overdue.length, "εργασία", "εργασίες")}</small></span><a href="#agenda" class="link">Όλα ›</a></div>
+    <div class="jx-sched-body">
+      <ul class="jx-list">${rows.length ? rows.map(row).join("") : `<li class="jx-empty">${art("calendar")}<span>Τίποτα προγραμματισμένο για σήμερα.</span></li>`}</ul>
+      <div class="jx-suggest"><span class="jx-bulb">${ic('<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/>')}</span><b>Ο JARVIS προτείνει</b><p>${esc(sug.text)}</p>${sug.id ? `<button class="jx-outline" data-action="open" data-id="${esc(sug.id)}">Λεπτομέρειες</button>` : `<button class="jx-outline" data-action="new-shop">Νέο μαγαζί</button>`}</div>
+    </div>
+  </section>
+  <button class="jx-ask" data-action="talk"><span class="jx-ask-ic">${ic('<path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4 3v-3H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/><path d="M8 10h8M8 13h5"/>')}</span><span class="grow"><b>Ρώτα τον JARVIS</b><small>«Ποια μαγαζιά να επισκεφτώ σήμερα;»</small></span><span class="chev">${ICON.chev}</span></button>
   ${weekCard()}
-  <section class="section">${head("Για σήμερα & εκπρόθεσμες", `<a href="#agenda" class="link">Ατζέντα</a>`)}
-    <div class="panel"><ul class="list">${due.length ? due.map(taskRow).join("") : emptyLi("tasks", "Δεν υπάρχουν εργασίες. Ό,τι υποσχεθείς σε μια επίσκεψη θα εμφανίζεται εδώ.")}</ul></div></section>
-  <section class="section">${head("Προγραμματισμένες επισκέψεις", `<span class="muted small">Επόμενες 7 μέρες</span>`)}
-    <div class="panel"><ul class="list">${in7.length ? in7.map((s) => shopRow(s, `Επίσκεψη ${fmtDate(s.nextVisit)}`)).join("") : emptyLi("calendar", "Δεν υπάρχουν προγραμματισμένες επισκέψεις. Όρισε επόμενη επίσκεψη σε κάποιο μαγαζί.")}</ul></div></section>
-  <section class="section">${head("Χρειάζονται επίσκεψη", `<span class="muted small">${QUIET_DAYS}+ μέρες χωρίς επίσκεψη</span>`)}
-    <div class="panel"><ul class="list">${quiet.length ? quiet.map((s) => shopRow(s, s.lastVisit ? `${daysSinceVisit(s)} μέρες από την επίσκεψη` : "Καμία επίσκεψη")).join("") : `<li class="empty">Όλοι οι πελάτες έχουν επίσκεψη τις τελευταίες ${QUIET_DAYS} μέρες.</li>`}</ul></div></section>
-  <section class="section">${head("Κορυφαίοι υποψήφιοι", `<a href="#prospects" class="link">Όλοι</a>`)}
-    <div class="panel"><ul class="list">${top.length ? top.map((s, i) => shopRow(s, "", i + 1)).join("") : `<li class="empty">Δεν υπάρχουν υποψήφιοι ακόμα. Πρόσθεσε ένα μαγαζί με κατάσταση «Υποψήφιος».</li>`}</ul></div></section>
-  <section class="section">${head("Τελευταίες επισκέψεις")}
-    <div class="panel"><ul class="list">${recent.length ? recent.map((v) => { const s = shopById(v.shopId); return `<li><button class="item" data-action="open" data-id="${esc(v.shopId)}">${s ? shopAvatar(s) : avatar("?")}<div class="grow"><div class="title">${esc(s ? s.name : "Μαγαζί")}</div><div class="sub">${fmtDate(v.date)} · ${esc(v.notes)}</div></div></button></li>`; }).join("") : `<li class="empty">Δεν έχουν καταγραφεί επισκέψεις ακόμα.</li>`}</ul></div></section>`;
+  ${quiet.length ? `<section class="section"><div class="section-head"><h2>Χρειάζονται επίσκεψη</h2><span class="muted small">${QUIET_DAYS}+ μέρες</span></div><div class="panel"><ul class="list">${quiet.map((s) => shopRow(s, s.lastVisit ? `${daysSinceVisit(s)} μέρες από την επίσκεψη` : "Καμία επίσκεψη")).join("")}</ul></div></section>` : ""}`;
 }
 
 function weekCard() {
@@ -409,7 +517,8 @@ function viewCatalogue(c) {
 /* ---------- views: settings ---------- */
 function viewSettings() {
   const vchip = (k, l) => `<button class="chip" data-action="voice-lang" data-v="${k}" aria-pressed="${state.voiceLang === k}">${l}</button>`;
-  return `<section class="section"><h2>Λογαριασμός</h2><div class="panel"><dl class="kv"><dt>Συνδεδεμένος ως</dt><dd>${esc(state.email || "")}</dd><dt>Συγχρονισμός</dt><dd>${esc(syncText())}</dd></dl></div></section>
+  const profile = canEdit() ? `<section class="section"><h2>Προφίλ</h2><form class="panel inline-form" data-form="profile"><div class="grid2">${fld({ form: "profile", name: "myName", label: "Πώς να σε λέει ο Jarvis", value: state.settings.myName ?? "Σωκράτη" })}${fld({ form: "profile", name: "visitTarget", label: "Στόχος επισκέψεων τον μήνα", type: "number", value: state.settings.visitTarget || 40, attrs: 'min="1" inputmode="numeric"' })}</div><div class="row-actions"><button class="btn primary small" type="submit">Αποθήκευση</button></div></form></section>` : "";
+  return `${profile}<section class="section"><h2>Λογαριασμός</h2><div class="panel"><dl class="kv"><dt>Συνδεδεμένος ως</dt><dd>${esc(state.email || "")}</dd><dt>Συγχρονισμός</dt><dd>${esc(syncText())}</dd></dl></div></section>
   <section class="section"><h2>Γλώσσα φωνής</h2><div class="chips">${vchip("el-GR", "Ελληνικά")}${vchip("en-US", "English")}</div><p class="muted small">Η γλώσσα που ακούει το μικρόφωνο του Talk. Ο Jarvis καταλαβαίνει και τις δύο.</p></section>
   <section class="section"><h2>Αντίγραφο ασφαλείας</h2><p class="muted small">Κατέβασε όλα τα δεδομένα (μαγαζιά, εργασίες, επισκέψεις, καταλόγους) σε ένα αρχείο. Οι φωτογραφίες μένουν στον ιδιωτικό σου χώρο.</p><div class="row-actions"><button class="btn" data-action="backup">Λήψη αντιγράφου</button></div></section>
   <div class="row-actions"><button class="btn danger" data-action="sign-out">Αποσύνδεση</button></div>`;
@@ -638,6 +747,7 @@ function render() {
   const tab = TABS.includes(state.view) ? state.view : PARENT[state.view];
   document.querySelectorAll("nav.tabs a").forEach((a) => a.setAttribute("aria-current", a.dataset.tab === tab ? "page" : "false"));
   renderChrome();
+  renderWelcome();
   const overdue = state.tasks.filter((t) => !t.done && t.due && t.due <= todayISO()).length;
   document.getElementById("task-badge").innerHTML = overdue ? `<span class="badge">${overdue}</span>` : "";
   const ready = state.noDb || (state.loaded.shops && state.loaded.tasks);
@@ -659,6 +769,40 @@ function render() {
   if (state.focusSearch) { const el = document.getElementById("shop-search"); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } state.focusSearch = false; }
   renderLightbox();
 }
+/* ---------- welcome screen (once per app launch) ---------- */
+const welcome = document.getElementById("welcome");
+const TIPS = [
+  "Βγήκες από ένα μαγαζί; Πάτα «Μίλα» και πες τι έγινε. Ο Jarvis γράφει την επίσκεψη και τις εργασίες.",
+  "Φωτογράφισε το back bar και ο Jarvis μετράει τις ετικέτες για το μερίδιο αγοράς.",
+  "Στο «Κοντά μου» βλέπεις τα πιο κοντινά μαγαζιά από εκεί που βρίσκεσαι.",
+  "Ρώτα τον Jarvis: «Ποια μαγαζιά στην Πλάκα δεν έχω επισκεφτεί αυτόν τον μήνα;»",
+  "Στην Ατζέντα βλέπεις μέρα με τη μέρα επισκέψεις και εργασίες.",
+];
+function showWelcome() {
+  try { if (sessionStorage.getItem("jarvis-welcomed")) return; } catch {}
+  document.getElementById("wl-tip").textContent = TIPS[new Date().getDate() % TIPS.length];
+  welcome.hidden = false; renderWelcome();
+}
+function renderWelcome() {
+  if (welcome.hidden) return;
+  const t = todayISO();
+  document.getElementById("wl-date").textContent = new Date().toLocaleDateString("el-GR", { weekday: "long", day: "numeric", month: "long" });
+  document.getElementById("wl-greet").textContent = greeting();
+  const ready = state.loaded.shops && state.loaded.tasks;
+  const due = state.tasks.filter((x) => !x.done && x.due && x.due <= t).length;
+  const visits = state.shops.filter((s) => s.nextVisit && s.nextVisit >= t && daysBetween(t, s.nextVisit) <= 7).length;
+  const customers = state.shops.filter((s) => s.status === "active").length;
+  const card = (n, label, icon) => `<div class="wl-card wl-stat"><span class="wl-ic">${icon}</span><b>${ready ? n : "–"}</b><span>${label}</span></div>`;
+  document.getElementById("wl-sub").textContent = !ready ? "Ετοιμάζω τη μέρα σου…" : due ? `Έχεις ${plural(due, "εργασία", "εργασίες")} για σήμερα. Πάμε!` : "Καμία εκκρεμότητα για σήμερα. Καλή δουλειά!";
+  document.getElementById("wl-cards").innerHTML = card(due, "Εργασίες σήμερα", ICON.check) + card(visits, "Επισκέψεις εβδομάδας", ic('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>')) + card(customers, "Πελάτες", ICON.shop);
+}
+function closeWelcome(then) {
+  try { sessionStorage.setItem("jarvis-welcomed", "1"); } catch {}
+  welcome.classList.add("leaving");
+  setTimeout(() => { welcome.hidden = true; welcome.classList.remove("leaving"); if (then) then(); }, 380);
+}
+welcome.addEventListener("click", (ev) => { const b = ev.target.closest("[data-wl]"); if (b) closeWelcome(b.dataset.wl === "talk" ? openTalk : null); });
+
 function renderChrome() {
   let title = TITLES[state.view] || "Jarvis", eyebrow = "", back = !!PARENT[state.view], actions = "";
   if (state.shopId) {
@@ -668,7 +812,7 @@ function renderChrome() {
     else if (state.editing) { title = "Επεξεργασία"; eyebrow = s ? s.name : ""; }
     else { title = "Μαγαζί"; if (s && canEdit()) actions = iconBtn("edit", "Επεξεργασία", ICON.edit); }
   } else if (state.catId) { const c = catById(state.catId); title = c ? c.company : "Κατάλογος"; eyebrow = "Κατάλογος"; back = true; }
-  else if (state.view === "today") { eyebrow = new Date().toLocaleDateString("el-GR", { weekday: "long", day: "numeric", month: "long" }); title = greeting(); }
+  else if (state.view === "today") { eyebrow = "Ο βοηθός πωλήσεών σου"; title = "J.A.R.V.I.S."; actions = iconBtn("go", "Ρυθμίσεις", ICON.gear, "settings"); }
   else if (state.view === "shops") actions = iconBtn("go", "Χάρτης", ICON.map, "map") + (canEdit() ? iconBtn("new-shop", "Νέο μαγαζί", ICON.plus) : "");
   else if (state.view === "map") actions = iconBtn("locate-me", "Πού βρίσκομαι", ICON.locate);
   document.getElementById("hdr-title").textContent = title;
@@ -856,6 +1000,8 @@ app.addEventListener("submit", async (ev) => {
     if (await guarded(() => ref.set({ company: v("company"), items: [], photos: [], createdAt: stamp }))) { state.dirty = false; openCat(ref.id); return; }
   } else if (kind === "cat-item") {
     await pushTo("catalogues", state.catId, "items", { brand: v("brand"), product: v("product"), category: v("category"), size: v("size"), price: v("price") });
+  } else if (kind === "profile") {
+    await guarded(() => state.db.doc("meta/settings").set({ ...state.settings, myName: v("myName"), visitTarget: Number(v("visitTarget")) || 40 }));
   } else if (kind === "settings") {
     await guarded(() => state.db.doc("meta/settings").set({ ...state.settings, myCompany: v("myCompany") }));
   }
@@ -1076,6 +1222,7 @@ async function startApp(session) {
   state.sample = makeSample();
   state.imgLimits = (await state.sample.limits()).images;
   routeFromHash();
+  showWelcome();
   const db = state.db;
   db.collection("shops").onSnapshot((snap) => { state.shops = snap.docs.map(clean); state.loaded.shops = true; safeRender(); });
   db.collection("tasks").onSnapshot((snap) => { state.tasks = snap.docs.map(clean); state.loaded.tasks = true; safeRender(); });
