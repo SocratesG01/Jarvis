@@ -1,6 +1,6 @@
 // Keeps the app itself available offline. Data is cached by the app (localStorage);
 // photos are cached here after they've been seen once.
-const VERSION = "jarvis-v7";
+const VERSION = "jarvis-v8";
 const SHELL = ["./", "index.html", "style.css", "app.js", "data.js", "config.js", "manifest.webmanifest", "icons/icon.svg", "icons/icon-192.png",
   "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/+esm"];
 
@@ -21,4 +21,10 @@ self.addEventListener("fetch", (e) => {
   }
   // App shell and fonts: network first (skipping the browser cache for our own files, so a new version shows at once), fall back to cache.
   e.respondWith(fetch(req, url.origin === location.origin ? { cache: "no-cache" } : {}).then((res) => { if (res.ok && (url.origin === location.origin || url.hostname.includes("jsdelivr") || url.hostname.includes("fonts."))) { const copy = res.clone(); caches.open(VERSION).then((c) => c.put(req, copy)); } return res; }).catch(() => caches.match(req).then((r) => r || caches.match("index.html"))));
+});
+
+// Tapping the daily summary opens Jarvis on the alerts page.
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  e.waitUntil(self.clients.matchAll({ type: "window" }).then((cs) => { const c = cs.find((x) => "focus" in x); if (c) { c.navigate(e.notification.data && e.notification.data.url || "./"); return c.focus(); } return self.clients.openWindow(e.notification.data && e.notification.data.url || "./"); }));
 });
