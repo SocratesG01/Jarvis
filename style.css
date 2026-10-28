@@ -615,3 +615,39 @@ html:root:root { --st-active: #34D399; --st-az: #A78BFA; --st-competitor: #F472B
 .split-legend { display: flex; flex-wrap: wrap; gap: 2px 14px; margin-top: 6px; }
 .split-legend button { font: inherit; font-size: 13px; color: var(--ink); background: none; border: 0; padding: 6px 0; cursor: pointer; }
 .split-legend .muted { font-size: 12px; }
+
+/* Day route, weekly report, alerts, status history */
+.icon-btn.bell { position: relative; }
+.icon-btn.bell .badge { position: absolute; top: 4px; right: 3px; margin: 0; min-width: 16px; height: 16px; line-height: 16px; text-align: center; color: #fff; box-shadow: 0 0 8px rgba(248, 113, 113, 0.8); }
+.icon-btn.small { width: 34px; height: 34px; color: var(--muted); }
+.icon-btn.small svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.route-cta { display: flex; align-items: center; gap: 12px; width: 100%; font: inherit; color: inherit; text-align: left; padding: 12px 14px; margin: 12px 0 4px; cursor: pointer; }
+.route-cta b { display: block; font-size: 15px; } .route-cta small { display: block; font-size: 12px; color: var(--muted); }
+.route-cta .tile-ic svg { width: 20px; height: 20px; }
+.route-card { padding: 0; }
+.route-map { display: block; width: 100%; height: auto; border-bottom: 1px solid var(--line); }
+.route-map polyline { fill: none; stroke: #22D3EE; stroke-width: 2.2; stroke-dasharray: 6 4; filter: drop-shadow(0 0 4px rgba(34, 211, 238, 0.7)); }
+.route-map .stop circle { fill: #0A1A2B; stroke: var(--st-active); stroke-width: 2; }
+.route-map .stop.prospect circle { stroke: var(--warn); } .route-map .stop.az circle { stroke: var(--st-az); } .route-map .stop.competitor circle { stroke: var(--st-competitor); }
+.route-map .stop text { font-family: var(--font-hud); font-size: 9px; font-weight: 700; fill: #fff; }
+.route-map .me { fill: var(--here); stroke: #fff; stroke-width: 2; }
+.route-sum { padding: 12px 14px; font-size: 14px; color: var(--muted); } .route-sum b { color: var(--ink); }
+.route-card .row-actions { padding: 0 14px 12px; }
+.stops { counter-reset: none; margin: 0; padding: 0; }
+.stop-n { width: 28px; height: 28px; flex: none; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-hud); font-size: 12px; font-weight: 700; color: var(--accent-ink); background: linear-gradient(140deg, #67E8F9, #06B6D4); box-shadow: 0 0 10px rgba(34, 211, 238, 0.5); }
+.stops .title a { color: inherit; text-decoration: none; }
+.item.pick .pick-box { width: 26px; height: 26px; flex: none; border-radius: 8px; display: grid; place-items: center; color: #67E8F9; border: 1px solid rgba(34, 211, 238, 0.4); }
+.item.pick .pick-box svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+.btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.stats .stat.good b { color: var(--good); } .stats .stat.bad b { color: var(--bad); }
+.report-text { display: block; width: 100%; border: 0; border-radius: 0; background: transparent; font: 14px/1.55 var(--font-body); color: var(--ink); padding: 14px; resize: vertical; }
+.notice { display: flex; align-items: center; gap: 12px; padding: 12px 14px; margin-bottom: 12px; } .notice .sub { font-size: 13px; color: var(--muted); }
+.item.alert .d { width: 9px; height: 9px; border-radius: 50%; flex: none; background: #67E8F9; box-shadow: 0 0 8px currentColor; color: #67E8F9; }
+.item.alert.bad .d { background: var(--bad); color: var(--bad); } .item.alert.warn .d { background: var(--warn); color: var(--warn); }
+.timeline { list-style: none; margin: 0; padding: 6px 14px; }
+.timeline li { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; }
+.timeline li + li { border-top: 1px solid rgba(34, 211, 238, 0.08); }
+.timeline .st-dot { margin-top: 6px; flex: none; }
+.timeline .sub { font-size: 12px; color: var(--muted); }
+.pill.lost { color: var(--bad); }
+button.link { background: none; border: 0; padding: 4px 0; font-family: inherit; cursor: pointer; }
