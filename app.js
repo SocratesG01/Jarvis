@@ -638,6 +638,7 @@ function render() {
   const tab = TABS.includes(state.view) ? state.view : PARENT[state.view];
   document.querySelectorAll("nav.tabs a").forEach((a) => a.setAttribute("aria-current", a.dataset.tab === tab ? "page" : "false"));
   renderChrome();
+  renderWelcome();
   const overdue = state.tasks.filter((t) => !t.done && t.due && t.due <= todayISO()).length;
   document.getElementById("task-badge").innerHTML = overdue ? `<span class="badge">${overdue}</span>` : "";
   const ready = state.noDb || (state.loaded.shops && state.loaded.tasks);
@@ -659,6 +660,40 @@ function render() {
   if (state.focusSearch) { const el = document.getElementById("shop-search"); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } state.focusSearch = false; }
   renderLightbox();
 }
+/* ---------- welcome screen (once per app launch) ---------- */
+const welcome = document.getElementById("welcome");
+const TIPS = [
+  "Βγήκες από ένα μαγαζί; Πάτα «Μίλα» και πες τι έγινε. Ο Jarvis γράφει την επίσκεψη και τις εργασίες.",
+  "Φωτογράφισε το back bar και ο Jarvis μετράει τις ετικέτες για το μερίδιο αγοράς.",
+  "Στο «Κοντά μου» βλέπεις τα πιο κοντινά μαγαζιά από εκεί που βρίσκεσαι.",
+  "Ρώτα τον Jarvis: «Ποια μαγαζιά στην Πλάκα δεν έχω επισκεφτεί αυτόν τον μήνα;»",
+  "Στην Ατζέντα βλέπεις μέρα με τη μέρα επισκέψεις και εργασίες.",
+];
+function showWelcome() {
+  try { if (sessionStorage.getItem("jarvis-welcomed")) return; } catch {}
+  document.getElementById("wl-tip").textContent = TIPS[new Date().getDate() % TIPS.length];
+  welcome.hidden = false; renderWelcome();
+}
+function renderWelcome() {
+  if (welcome.hidden) return;
+  const t = todayISO();
+  document.getElementById("wl-date").textContent = new Date().toLocaleDateString("el-GR", { weekday: "long", day: "numeric", month: "long" });
+  document.getElementById("wl-greet").textContent = greeting();
+  const ready = state.loaded.shops && state.loaded.tasks;
+  const due = state.tasks.filter((x) => !x.done && x.due && x.due <= t).length;
+  const visits = state.shops.filter((s) => s.nextVisit && s.nextVisit >= t && daysBetween(t, s.nextVisit) <= 7).length;
+  const customers = state.shops.filter((s) => s.status === "active").length;
+  const card = (n, label, icon) => `<div class="wl-card wl-stat"><span class="wl-ic">${icon}</span><b>${ready ? n : "–"}</b><span>${label}</span></div>`;
+  document.getElementById("wl-sub").textContent = !ready ? "Ετοιμάζω τη μέρα σου…" : due ? `Έχεις ${plural(due, "εργασία", "εργασίες")} για σήμερα. Πάμε!` : "Καμία εκκρεμότητα για σήμερα. Καλή δουλειά!";
+  document.getElementById("wl-cards").innerHTML = card(due, "Εργασίες σήμερα", ICON.check) + card(visits, "Επισκέψεις εβδομάδας", ic('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>')) + card(customers, "Πελάτες", ICON.shop);
+}
+function closeWelcome(then) {
+  try { sessionStorage.setItem("jarvis-welcomed", "1"); } catch {}
+  welcome.classList.add("leaving");
+  setTimeout(() => { welcome.hidden = true; welcome.classList.remove("leaving"); if (then) then(); }, 380);
+}
+welcome.addEventListener("click", (ev) => { const b = ev.target.closest("[data-wl]"); if (b) closeWelcome(b.dataset.wl === "talk" ? openTalk : null); });
+
 function renderChrome() {
   let title = TITLES[state.view] || "Jarvis", eyebrow = "", back = !!PARENT[state.view], actions = "";
   if (state.shopId) {
@@ -1076,6 +1111,7 @@ async function startApp(session) {
   state.sample = makeSample();
   state.imgLimits = (await state.sample.limits()).images;
   routeFromHash();
+  showWelcome();
   const db = state.db;
   db.collection("shops").onSnapshot((snap) => { state.shops = snap.docs.map(clean); state.loaded.shops = true; safeRender(); });
   db.collection("tasks").onSnapshot((snap) => { state.tasks = snap.docs.map(clean); state.loaded.tasks = true; safeRender(); });
