@@ -1,6 +1,6 @@
 // Keeps the app itself available offline. Data is cached by the app (localStorage);
 // photos are cached here after they've been seen once.
-const VERSION = "jarvis-v9";
+const VERSION = "jarvis-v10";
 const SHELL = ["./", "index.html", "style.css", "app.js", "data.js", "config.js", "manifest.webmanifest", "icons/icon.svg", "icons/icon-192.png",
   "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/+esm"];
 
