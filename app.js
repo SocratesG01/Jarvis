@@ -712,6 +712,12 @@ function parseIcs(text, from, to) {
   }
   return out.sort((a, b) => (a.day + (a.time || "00:00")).localeCompare(b.day + (b.time || "00:00")));
 }
+const calWhy = (w) => /^ics_404/.test(w) ? "Το Google δεν βρήκε αυτό το ημερολόγιο. Μάλλον αντέγραψες τη δημόσια διεύθυνση ή κόπηκε ένα κομμάτι. Αντέγραψε ξανά τη «Μυστική διεύθυνση σε μορφή iCal» (περιέχει τη λέξη private)."
+  : /^ics_40[13]/.test(w) ? "Το Google δεν επιτρέπει την πρόσβαση με αυτόν τον σύνδεσμο. Αντέγραψε ξανά τη «Μυστική διεύθυνση σε μορφή iCal»."
+  : w === "bad_ics_url" ? "Ο σύνδεσμος πρέπει να ξεκινά με https:// και να τελειώνει σε basic.ics."
+  : w === "not_allowed" ? "Ο server δεν σε αναγνώρισε. Αποσυνδέσου και συνδέσου ξανά."
+  : `Δεν μπόρεσα να διαβάσω το ημερολόγιο (${w || "άγνωστο σφάλμα"}).`;
+const cleanIcs = (u) => String(u || "").replace(/\s+/g, "").replace(/^webcal:\/\//i, "https://");
 async function loadCalendar(force = false) {
   const url = state.settings.icsUrl;
   if (!url || !state.sample || !state.sample.ics) { state.cal = null; return; }
@@ -722,7 +728,7 @@ async function loadCalendar(force = false) {
     const t = todayISO(), events = parseIcs(await state.sample.ics(url), addDays(t, -7), addDays(t, 60));
     state.cal = { url, at: Date.now(), events };
     try { localStorage.setItem("jarvis-cal", JSON.stringify(state.cal)); } catch {}
-  } catch (e) { state.cal = { ...(state.cal || { events: [] }), url, at: Date.now(), error: e && e.code === "server_old" ? "server_old" : "load" }; }
+  } catch (e) { state.cal = { ...(state.cal || { events: [] }), url, at: Date.now(), error: e && e.code === "server_old" ? "server_old" : "load", why: String((e && e.message) || (e && e.code) || "") }; }
   state.calLoading = false; safeRender();
 }
 const calOn = (day) => (state.cal && state.cal.url === state.settings.icsUrl ? state.cal.events : []).filter((e) => e.day === day);
@@ -890,7 +896,7 @@ function viewSettings() {
   const profile = canEdit() ? `<section class="section"><h2>Προφίλ</h2><form class="panel inline-form" data-form="profile"><div class="grid2">${fld({ form: "profile", name: "myName", label: "Πώς να σε λέει ο Jarvis", value: state.settings.myName ?? "Σωκράτη" })}${fld({ form: "profile", name: "visitTarget", label: "Στόχος επισκέψεων τον μήνα", type: "number", value: state.settings.visitTarget || 40, attrs: 'min="1" inputmode="numeric"' })}</div><div class="row-actions"><button class="btn primary small" type="submit">Αποθήκευση</button></div></form></section>` : "";
   const cal = canEdit() ? `<section class="section"><h2>Ημερολόγιο</h2><form class="panel inline-form" data-form="calendar">${fld({ form: "calendar", name: "icsUrl", label: "Ιδιωτική διεύθυνση iCal του Google Calendar", value: state.settings.icsUrl || "", ph: "https://calendar.google.com/calendar/ical/.../basic.ics" })}
     <p class="muted small">Στο Google Calendar (από υπολογιστή): Ρυθμίσεις → το ημερολόγιό σου → «Ενσωμάτωση ημερολογίου» → «Μυστική διεύθυνση σε μορφή iCal». Αντέγραψέ την εδώ και τα ραντεβού σου θα φαίνονται στην Ατζέντα. Μένει ιδιωτική στον λογαριασμό σου.</p>
-    ${state.cal && state.cal.error ? `<p class="small" style="color:var(--bad)">${state.cal.error === "server_old" ? "Χρειάζεται η ενημερωμένη έκδοση του jarvis-ai στο Supabase." : "Δεν μπόρεσα να διαβάσω το ημερολόγιο. Έλεγξε τη διεύθυνση."}</p>` : state.cal && state.cal.url === state.settings.icsUrl ? `<p class="muted small">Συνδεδεμένο ✓ ${plural(state.cal.events.length, "ραντεβού", "ραντεβού")} τις επόμενες εβδομάδες.</p>` : ""}
+    ${state.cal && state.cal.error ? `<p class="small" style="color:var(--bad)">${state.cal.error === "server_old" ? "Χρειάζεται η ενημερωμένη έκδοση του jarvis-ai στο Supabase." : calWhy(state.cal.why)}</p>` : state.cal && state.cal.url === state.settings.icsUrl ? `<p class="muted small">Συνδεδεμένο ✓ ${plural(state.cal.events.length, "ραντεβού", "ραντεβού")} τις επόμενες εβδομάδες.</p>` : ""}
     <div class="row-actions"><button class="btn primary small" type="submit">Αποθήκευση</button>${state.settings.icsUrl ? `<button class="btn small" type="button" data-action="cal-refresh">Ανανέωση</button>` : ""}</div></form>
     <div class="row-actions"><button class="btn" data-action="cal-export">Λήψη επισκέψεων & εργασιών (.ics)</button></div><p class="muted small">Το αρχείο .ics ανοίγει σε Google Calendar, Outlook ή iPhone και περνάει όλες τις προγραμματισμένες επισκέψεις και εργασίες.</p></section>` : "";
   return `${profile}${cal}<section class="section"><h2>Λογαριασμός</h2><div class="panel"><dl class="kv"><dt>Συνδεδεμένος ως</dt><dd>${esc(state.email || "")}</dd><dt>Συγχρονισμός</dt><dd>${esc(syncText())}</dd></dl></div></section>
@@ -1403,8 +1409,9 @@ app.addEventListener("submit", async (ev) => {
   } else if (kind === "profile") {
     await guarded(() => state.db.doc("meta/settings").set({ ...state.settings, myName: v("myName"), visitTarget: Number(v("visitTarget")) || 40 }));
   } else if (kind === "calendar") {
-    await guarded(() => state.db.doc("meta/settings").set({ ...state.settings, icsUrl: v("icsUrl") }));
-    state.settings.icsUrl = v("icsUrl"); loadCalendar(true);
+    const icsUrl = cleanIcs(v("icsUrl"));
+    await guarded(() => state.db.doc("meta/settings").set({ ...state.settings, icsUrl }));
+    state.settings.icsUrl = icsUrl; loadCalendar(true);
   } else if (kind === "settings") {
     await guarded(() => state.db.doc("meta/settings").set({ ...state.settings, myCompany: v("myCompany") }));
   }

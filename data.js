@@ -179,7 +179,13 @@ export function makeSample() {
   async function ics(url) {
     if (!navigator.onLine) throw { code: "offline" };
     const { data, error } = await sb.functions.invoke("jarvis-ai", { body: { ics_url: url } });
-    if (error) throw { code: "ai_error", message: error.message };
+    if (error) {
+      // Read the server's reason: an old server answers "empty_prompt", a bad link answers "ics_404" etc.
+      let body = null; try { body = await error.context.json(); } catch {}
+      const why = body && body.error;
+      if (why === "empty_prompt") throw { code: "server_old" };
+      throw { code: why ? "ics_error" : "ai_error", message: why || `${error.message}${error.context && error.context.status ? " (" + error.context.status + ")" : ""}` };
+    }
     if (!data || data.version !== 2) throw { code: "server_old" };
     if (data.error) throw { code: "ics_error", message: data.error };
     return data.ics || "";
