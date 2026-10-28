@@ -591,3 +591,27 @@ nav.tabs a[aria-current="page"] svg { filter: drop-shadow(0 0 5px rgba(34, 211, 
 .wl-link { color: #67E8F9; }
 .wl-form input { background: #071423; color: #E8F2FB; border: 1px solid rgba(34, 211, 238, 0.25); }
 .wl-form #login-msg { color: #67E8F9; }
+
+/* Shop ownership: ours, ΑΖ, competition */
+html:root:root { --st-active: #34D399; --st-az: #A78BFA; --st-competitor: #F472B6; }
+.st-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: 0; background: var(--muted); }
+.st-dot.active { background: var(--st-active); box-shadow: 0 0 6px var(--st-active); }
+.st-dot.az { background: var(--st-az); box-shadow: 0 0 6px var(--st-az); }
+.st-dot.competitor { background: var(--st-competitor); box-shadow: 0 0 6px var(--st-competitor); }
+.st-dot.prospect { background: var(--warn); }
+.st-dot.closed, .st-dot.lost { background: var(--bad); }
+.legend i.st-dot { width: 10px; height: 10px; }
+.pill.az { color: var(--st-az); }
+.pill.competitor { color: var(--st-competitor); }
+.map .dot.az { fill: var(--st-az); }
+.map .dot.competitor { fill: var(--st-competitor); }
+.tm-dot.az circle { fill: var(--st-az); } .tm-dot.az .halo { fill: rgba(167, 139, 250, 0.22); }
+.tm-dot.competitor circle { fill: var(--st-competitor); } .tm-dot.competitor .halo { fill: rgba(244, 114, 182, 0.22); }
+.split { padding: 12px 14px 8px; margin-top: 12px; }
+.split-bar { display: flex; gap: 3px; height: 10px; border-radius: 99px; overflow: hidden; }
+.split-bar span.active { background: var(--st-active); box-shadow: 0 0 10px var(--st-active); }
+.split-bar span.az { background: var(--st-az); }
+.split-bar span.competitor { background: var(--st-competitor); }
+.split-legend { display: flex; flex-wrap: wrap; gap: 2px 14px; margin-top: 6px; }
+.split-legend button { font: inherit; font-size: 13px; color: var(--ink); background: none; border: 0; padding: 6px 0; cursor: pointer; }
+.split-legend .muted { font-size: 12px; }

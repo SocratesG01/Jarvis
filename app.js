@@ -2,7 +2,7 @@ import { sb, makeDb, makeAssets, makeSample } from "./data.js";
 
 /* ---------- reference lists ---------- */
 const TYPES = ["Restaurant", "Café", "Bar", "Cocktail bar", "Hotel", "Beach bar", "Club", "Taverna", "Kiosk / mini market", "Catering", "Other"];
-const STATUSES = { active: "Πελάτης", prospect: "Υποψήφιος", closed: "Έκλεισε", lost: "Χαμένος" };
+const STATUSES = { active: "Πελάτης", az: "ΑΖ", competitor: "Ανταγωνισμός", prospect: "Υποψήφιος", closed: "Έκλεισε", lost: "Χαμένος" };
 const AREAS = ["Thiseio", "Plaka", "Monastiraki", "Psyrri", "Koukaki", "Kolonaki", "Syntagma", "Exarchia", "Gazi", "Kerameikos", "Pangrati", "Metaxourgeio", "Makrygianni", "Piraeus", "Glyfada"];
 const CRITERIA = [["volume", "Δυνητικός όγκος"], ["location", "Τοποθεσία & κίνηση"], ["fit", "Ταίριασμα με τη γκάμα μας"], ["access", "Πρόσβαση σε αυτόν που αποφασίζει"]];
 const ASSET_TYPES = ["Beer fridge", "Drinks fridge", "Freezer", "Beer tap / tower", "Keg cooler", "Coffee machine", "Coffee grinder", "Ice machine", "Display cabinet", "Furniture", "Other"];
@@ -410,7 +410,9 @@ function viewShops() {
   const groups = {};
   list.forEach((s) => (groups[areaOf(s)] = groups[areaOf(s)] || []).push(s));
   const nearMode = state.near && state.here;
-  const chip = (k, label) => `<button class="chip" data-action="filter" data-f="${k}" aria-pressed="${state.shopFilter === k}">${label}</button>`;
+  const count = (k) => k === "all" ? state.shops.length : state.shops.filter((s) => s.status === k).length;
+  const chip = (k, label) => `<button class="chip" data-action="filter" data-f="${k}" aria-pressed="${state.shopFilter === k}">${k !== "all" ? `<i class="st-dot ${k}"></i>` : ""}${label}<span class="n">${count(k)}</span></button>`;
+  const split = ["active", "az", "competitor"].map((k) => [k, count(k)]), splitTotal = split.reduce((a, [, n]) => a + n, 0);
   const achip = (k, label, n) => `<button class="chip" data-action="area" data-a="${esc(k)}" aria-pressed="${state.areaFilter === k}">${k === "all" ? "" : `<i class="area-dot" style="--h:${hue(k)}"></i>`}${esc(label)}${n != null ? `<span class="n">${n}</span>` : ""}</button>`;
   let body;
   if (!list.length) body = `<div class="panel">${emptyDiv("pin", state.shops.length ? "Κανένα μαγαζί δεν ταιριάζει." : "Δεν υπάρχουν μαγαζιά ακόμα. Πρόσθεσε το πρώτο ή πες το στον Jarvis μετά από μια επίσκεψη.")}</div>`;
@@ -424,7 +426,8 @@ function viewShops() {
       <div class="panel"><ul class="list">${groups[a].sort((x, y) => (x.name || "").localeCompare(y.name || "")).map((s) => shopRow(s)).join("")}</ul></div></section>`).join("");
   return `${banner()}
   <div class="search">${ic('<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>')}<input id="shop-search" type="search" placeholder="Αναζήτηση: όνομα, περιοχή, ιδιοκτήτης" value="${esc(state.query)}" data-action="search" aria-label="Αναζήτηση μαγαζιών"></div>
-  <div class="scroller"><button class="chip" data-action="near" aria-pressed="${!!state.near}">📍 Κοντά μου</button>${chip("all", "Όλα")}${chip("active", "Πελάτες")}${chip("prospect", "Υποψήφιοι")}${chip("closed", "Έκλεισαν")}${chip("lost", "Χαμένοι")}</div>
+  <div class="scroller"><button class="chip" data-action="near" aria-pressed="${!!state.near}">📍 Κοντά μου</button>${chip("all", "Όλα")}${chip("active", "Πελάτες")}${chip("az", "ΑΖ")}${chip("competitor", "Ανταγωνισμός")}${chip("prospect", "Υποψήφιοι")}${chip("closed", "Έκλεισαν")}${chip("lost", "Χαμένοι")}</div>
+  ${splitTotal ? `<div class="split panel"><div class="split-bar">${split.map(([k, n]) => n ? `<span class="${k}" style="flex:${n}"></span>` : "").join("")}</div><div class="split-legend">${split.map(([k, n]) => `<button data-action="filter" data-f="${k}"><i class="st-dot ${k}"></i>${STATUSES[k]} <b class="num">${n}</b> <span class="muted">${Math.round(n / splitTotal * 100)}%</span></button>`).join("")}</div></div>` : ""}
   <div class="scroller" role="group" aria-label="Περιοχές">${achip("all", "Όλες οι περιοχές", byStatus.length)}${Object.keys(areaCounts).sort().map((a) => achip(a, a, areaCounts[a])).join("")}</div>
   ${body}`;
 }
@@ -452,7 +455,7 @@ function viewMap() {
     const showNames = geo.length <= 30;
     const dots = geo.map((s) => { const [x, y] = xy(s); return `<g><circle class="dot ${esc(s.status)}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="8" data-action="open" data-id="${esc(s.id)}" tabindex="0" role="button" aria-label="${esc(s.name)}"><title>${esc(s.name)} · ${esc(STATUSES[s.status] || "")}</title></circle>${showNames ? `<text class="lbl" x="${(x > W * 0.65 ? x - 12 : x + 12).toFixed(1)}" y="${(y + 4).toFixed(1)}" text-anchor="${x > W * 0.65 ? "end" : "start"}">${esc((s.name || "").replace(/^Example:\s*/, "").slice(0, 22))}</text>` : ""}</g>`; }).join("");
     svg = `<div class="map"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Χάρτης με τα μαγαζιά σου"><rect class="frame" x="0" y="0" width="${W}" height="${H}" rx="10"/>${areaLbls}${dots}${state.here ? (() => { const [x, y] = xy(state.here); return `<circle class="here-ring" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="14"/><circle class="here" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="6"><title>Είσαι εδώ</title></circle>`; })() : ""}</svg></div>
-    <div class="legend"><span><i style="background:var(--good)"></i>Πελάτης</span><span><i style="background:var(--warn)"></i>Υποψήφιος</span><span><i style="background:var(--bad)"></i>Έκλεισε ή χάθηκε</span><span><i style="background:var(--here)"></i>Εσύ</span></div>`;
+    <div class="legend"><span><i class="st-dot active"></i>Πελάτης</span><span><i class="st-dot az"></i>ΑΖ</span><span><i class="st-dot competitor"></i>Ανταγωνισμός</span><span><i style="background:var(--warn)"></i>Υποψήφιος</span><span><i style="background:var(--bad)"></i>Έκλεισε ή χάθηκε</span><span><i style="background:var(--here)"></i>Εσύ</span></div>`;
   }
   return `${banner()}<p class="muted small">Όλα τα μαγαζιά με αποθηκευμένη τοποθεσία. Πάτα μια κουκκίδα για να ανοίξεις το μαγαζί. Το κουμπί στόχου επάνω δείχνει πού βρίσκεσαι.</p>
   ${areas.length > 1 ? `<div class="scroller">${achip("all", "Όλες οι περιοχές")}${areas.map((a) => achip(a, a)).join("")}</div>` : ""}
@@ -1032,6 +1035,7 @@ ${cur ? `The rep currently has this shop open, so assume they mean it unless the
 
 Decide whether the rep is REPORTING information to save, or ASKING a question about their data.
 
+Shop status meanings: active = our customer, az = an ΑΖ shop, competitor = a shop that works with the competition, prospect = possible new customer, closed / lost.
 Known shops (full data):
 ${JSON.stringify(digest(true))}
 Open tasks: ${JSON.stringify(openTasks)}
@@ -1044,7 +1048,7 @@ Reply with only one JSON object of this shape (omit empty fields):
  "answer": "for questions: a short, direct spoken-style answer using the data above",
  "summary": "for updates: one sentence describing what you will save",
  "shopId": "id of the existing shop this is about, or null",
- "newShop": {"name":"","type":"Restaurant|Café|Bar|Cocktail bar|Hotel|Beach bar|Club|Taverna|Kiosk / mini market|Catering|Other","area":"","city":"Athens","address":"","status":"active|prospect|closed|lost"} or null (only when no existing shop matches),
+ "newShop": {"name":"","type":"Restaurant|Café|Bar|Cocktail bar|Hotel|Beach bar|Club|Taverna|Kiosk / mini market|Catering|Other","area":"","city":"Athens","address":"","status":"active|az|competitor|prospect|closed|lost"} or null (only when no existing shop matches),
  "fields": {"owner":"","address":"","area":"","status":"","nextVisit":"YYYY-MM-DD","investAmount":0,"insideInfoAdd":"text to append","pricingNotesAdd":"text to append","scores":{"volume":0-5,"location":0-5,"fit":0-5,"access":0-5}},
  "visit": {"date":"YYYY-MM-DD","notes":"clean, complete summary of the visit in the rep's words"},
  "contacts": [{"name":"","role":"","phone":"","email":"","notes":""}],
