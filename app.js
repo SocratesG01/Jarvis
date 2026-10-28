@@ -72,19 +72,44 @@ function datalists() {
   return dl("dl-brands", brands) + dl("dl-companies", companies) + dl("dl-areas", areas) + dl("dl-cities", cities) + dl("dl-products", products) + dl("dl-cats", new Set(CATEGORIES));
 }
 
-document.getElementById("hdr-date").textContent = new Date().toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
 
 /* ---------- navigation ---------- */
-const TABS = ["today", "shops", "map", "market", "tasks"];
+const TABS = ["today", "shops", "agenda", "more"];
+const PARENT = { map: "more", prospects: "more", market: "more", catalogues: "more", tasks: "agenda", settings: "more" };
+const PAGES = [...TABS, ...Object.keys(PARENT)];
+const TITLES = { today: "Jarvis", shops: "Shops", agenda: "Agenda", more: "More", map: "Map", prospects: "Prospects", market: "Market share", catalogues: "Catalogues", tasks: "All tasks", settings: "Settings" };
+function nav(view) { if (location.hash.slice(1) === view) go(view); else location.hash = view; }
 function go(view) { Object.assign(state, { reading: null, view, shopId: null, catId: null, editing: false, armed: null, dirty: false }); render(); window.scrollTo(0, 0); }
 function openShop(id, opts = {}) { Object.assign(state, { reading: null, shopId: id, catId: null, editing: !!opts.edit, armed: null, dirty: false, shopTab: opts.tab || "overview", consProduct: null }); render(); window.scrollTo(0, 0); }
 function openCat(id) { Object.assign(state, { reading: null, catId: id, shopId: null, editing: false, armed: null, dirty: false }); render(); window.scrollTo(0, 0); }
-function routeFromHash() { const h = location.hash.slice(1); go(TABS.includes(h) ? h : "today"); }
+function routeFromHash() { const h = location.hash.slice(1); go(PAGES.includes(h) ? h : "today"); }
 window.addEventListener("hashchange", routeFromHash);
 
 /* ---------- shared bits ---------- */
-const micHint = `<div class="hint"><div class="mic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-2.1A7 7 0 0 0 19 12z"/></svg></div>
-<div><b>Just left a shop?</b> Tap <b>Talk</b>, then the microphone on your keyboard, and tell Jarvis what happened. You'll see what will be saved before anything changes. You can also ask questions, like "which Plaka shops haven't I visited this month?"</div></div>`;
+const ic = (d) => `<svg viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
+const ICON = {
+  mic: ic('<path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/><path d="M18 11a6 6 0 0 1-12 0M12 17v4"/>'),
+  plus: ic('<path d="M12 5v14M5 12h14"/>'),
+  map: ic('<path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/>'),
+  locate: ic('<circle cx="12" cy="12" r="3.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7.5"/>'),
+  edit: ic('<path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/>'),
+  star: ic('<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>'),
+  chart: ic('<path d="M4 20h16M7 16v-5M12 16V6M17 16v-8"/>'),
+  book: ic('<path d="M5 4h10a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4zM5 17a3 3 0 0 1 3-3h10"/>'),
+  check: ic('<path d="M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/>'),
+  gear: ic('<circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.4 2.6a7 7 0 0 0-2 1.2l-2.5-1-2 3.4 2 1.6a7 7 0 0 0 0 2.4l-2 1.6 2 3.4 2.5-1a7 7 0 0 0 2 1.2L10 21h4l.4-2.6a7 7 0 0 0 2-1.2l2.5 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"/>'),
+  nav: ic('<path d="M3 11l18-8-8 18-2-8-8-2z"/>'),
+  phone: ic('<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/>'),
+  camera: ic('<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>'),
+  shop: ic('<path d="M4 10l1.5-5h13L20 10M4 10v10h16V10M4 10h16M9 20v-5h6v5"/>'),
+  chev: ic('<path d="M9 5l7 7-7 7"/>'),
+};
+const iconBtn = (action, label, icon, v = "") => `<button class="icon-btn" data-action="${action}" ${v ? `data-v="${v}"` : ""} aria-label="${esc(label)}" title="${esc(label)}">${icon}</button>`;
+const hue = (t) => [...String(t || "?")].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 17);
+const avatar = (name, cls = "ph") => { const n = String(name || "?").replace(/^Example:\s*/, ""); return `<span class="${cls} av" style="--h:${hue(n)}" aria-hidden="true">${esc(n.charAt(0).toUpperCase())}</span>`; };
+const addDays = (iso, n) => { const d = new Date(iso + "T00:00:00"); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+const greeting = () => { const h = new Date().getHours(); return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"; };
+const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
 function banner() {
   if (state.noDb) return `<div class="banner">You're offline and this phone has no saved copy yet. Connect once to load your shops.</div>`;
@@ -96,12 +121,12 @@ function shopRow(s, extra = "", rank = null) {
   const sc = scoreOf(s);
   const c = cover(s);
   const left = rank != null ? `<div class="score ${sc == null || sc < 50 ? "low" : ""}">${sc == null ? "–" : sc}</div>`
-    : c ? `<span class="thumb"><img ${img(c)} alt="" loading="lazy"></span>` : `<span class="ph" aria-hidden="true">${esc((s.name || "?").replace(/^Example:\s*/, "").charAt(0).toUpperCase())}</span>`;
+    : c ? `<span class="thumb"><img ${img(c)} alt="" loading="lazy"></span>` : avatar(s.name);
   const last = s.lastVisit ? `Visited ${fmtDate(s.lastVisit)}` : "Not visited yet";
   return `<li><button class="item" data-action="open" data-id="${esc(s.id)}">${left}
     <div class="grow"><div class="title">${rank != null ? `<span class="muted num">#${rank}</span> ` : ""}${esc(s.name || "Untitled shop")}</div>
     <div class="sub">${esc([s.type, areaOf(s) === "No area" ? "" : s.area].filter(Boolean).join(" · "))}${s.type || s.area ? " · " : ""}${extra || last}</div></div>
-    ${s.example ? `<span class="pill example">Example</span>` : `<span class="pill ${esc(s.status)}">${esc(STATUSES[s.status] || "")}</span>`}
+    ${s.example ? `<span class="pill example">Example</span>` : `<span class="pill ${esc(s.status)}">${esc(STATUSES[s.status] || "")}</span>`}<span class="chev">${ICON.chev}</span>
   </button></li>`;
 }
 
@@ -150,20 +175,74 @@ function viewToday() {
   const top = state.shops.filter((s) => s.status === "prospect").sort((a, b) => (scoreOf(b) ?? -1) - (scoreOf(a) ?? -1)).slice(0, 3);
   const recent = state.visits.slice(0, 4);
   const counts = { active: 0, prospect: 0, closed: 0 }; state.shops.forEach((s) => { if (counts[s.status] != null) counts[s.status]++; });
+  const stat = (n, label, action, v) => `<button class="hero-stat" data-action="${action}" data-v="${v}"><b>${n}</b><span>${label}</span></button>`;
+  const quick = (action, v, icon, label) => `<button class="quick-btn" data-action="${action}" ${v ? `data-v="${v}"` : ""}><span class="quick-ic">${icon}</span>${label}</button>`;
+  const head = (title, link) => `<div class="section-head"><h2>${title}</h2>${link || ""}</div>`;
   return `${banner()}
-  <div class="section"><span class="eyebrow">Your day</span><h1>${due.length} task${due.length === 1 ? "" : "s"} due, ${in7.length} visit${in7.length === 1 ? "" : "s"} planned this week</h1></div>
-  <div class="stats"><div class="stat"><b>${counts.active}</b><span>Customers</span></div><div class="stat"><b>${counts.prospect}</b><span>Prospects</span></div><div class="stat"><b>${new Set(state.shops.map(areaOf)).size}</b><span>Areas</span></div><div class="stat"><b>${counts.closed}</b><span>Closed down</span></div></div>
-  ${micHint}
-  <section class="section"><div class="section-head"><h2>Due today & overdue</h2><a href="#tasks" class="muted small">All tasks</a></div>
+  <section class="hero">
+    <p class="hero-line">${due.length ? `<b>${plural(due.length, "task")}</b> due` : "No tasks due"} · ${in7.length ? `<b>${plural(in7.length, "visit")}</b> planned this week` : "no visits planned this week"}</p>
+    <div class="hero-stats">${stat(counts.active, "Customers", "shop-filter", "active")}${stat(counts.prospect, "Prospects", "go", "prospects")}${stat(new Set(state.shops.map(areaOf)).size, "Areas", "shop-filter", "all")}${stat(counts.closed, "Closed", "shop-filter", "closed")}</div>
+  </section>
+  <div class="quick">${quick("talk", "", ICON.mic, "Debrief")}${canEdit() ? quick("new-shop", "", ICON.plus, "New shop") : ""}${quick("near-go", "", ICON.locate, "Near me")}${quick("go", "map", ICON.map, "Map")}</div>
+  <section class="section">${head("Due today & overdue", `<a href="#agenda" class="link">Agenda</a>`)}
     <div class="panel"><ul class="list">${due.length ? due.map(taskRow).join("") : `<li class="empty">No tasks due. Follow-ups you mention after a visit land here.</li>`}</ul></div></section>
-  <section class="section"><h2>Planned visits, next 7 days</h2>
+  <section class="section">${head("Planned visits", `<span class="muted small">Next 7 days</span>`)}
     <div class="panel"><ul class="list">${in7.length ? in7.map((s) => shopRow(s, `Visit ${fmtDate(s.nextVisit)}`)).join("") : `<li class="empty">No visits planned. Set a next visit on any shop.</li>`}</ul></div></section>
-  <section class="section"><div class="section-head"><h2>Going quiet</h2><span class="muted small">${QUIET_DAYS}+ days since last visit</span></div>
+  <section class="section">${head("Going quiet", `<span class="muted small">${QUIET_DAYS}+ days since visit</span>`)}
     <div class="panel"><ul class="list">${quiet.length ? quiet.map((s) => shopRow(s, s.lastVisit ? `${daysSinceVisit(s)} days since visit` : "Never visited")).join("") : `<li class="empty">Every customer has been visited in the last ${QUIET_DAYS} days.</li>`}</ul></div></section>
-  <section class="section"><h2>Top prospects</h2>
+  <section class="section">${head("Top prospects", `<a href="#prospects" class="link">See all</a>`)}
     <div class="panel"><ul class="list">${top.length ? top.map((s, i) => shopRow(s, "", i + 1)).join("") : `<li class="empty">No prospects yet. Add a shop and set its status to Prospect.</li>`}</ul></div></section>
-  <section class="section"><h2>Latest visit notes</h2>
-    <div class="panel"><ul class="list">${recent.length ? recent.map((v) => { const s = shopById(v.shopId); return `<li class="item"><div class="grow"><div class="title">${esc(s ? s.name : "Shop")}</div><div class="sub">${fmtDate(v.date)} · ${esc(v.notes)}</div></div></li>`; }).join("") : `<li class="empty">No visits logged yet.</li>`}</ul></div></section>`;
+  <section class="section">${head("Latest visit notes")}
+    <div class="panel"><ul class="list">${recent.length ? recent.map((v) => { const s = shopById(v.shopId); return `<li><button class="item" data-action="open" data-id="${esc(v.shopId)}">${avatar(s ? s.name : "?")}<div class="grow"><div class="title">${esc(s ? s.name : "Shop")}</div><div class="sub">${fmtDate(v.date)} · ${esc(v.notes)}</div></div></button></li>`; }).join("") : `<li class="empty">No visits logged yet.</li>`}</ul></div></section>`;
+}
+
+/* ---------- views: agenda ---------- */
+function viewAgenda() {
+  const t = todayISO(), sel = state.agendaDay || t;
+  const days = Array.from({ length: 21 }, (_, i) => addDays(t, i - 1));
+  if (!days.includes(sel)) days.push(sel);
+  const visitsOn = (day) => state.shops.filter((s) => s.nextVisit === day);
+  const tasksOn = (day) => state.tasks.filter((x) => !x.done && x.due === day);
+  const strip = `<div class="daystrip" role="group" aria-label="Days">${days.map((day) => { const dt = new Date(day + "T00:00:00"); const n = visitsOn(day).length + tasksOn(day).length; return `<button class="day ${day === t ? "today" : ""}" data-action="agenda-day" data-v="${day}" aria-pressed="${day === sel}"><span>${dt.toLocaleDateString("en-GB", { weekday: "short" })}</span><b>${dt.getDate()}</b><i class="${n ? "on" : ""}"></i></button>`; }).join("")}</div>`;
+  const overdue = sel === t ? state.tasks.filter((x) => !x.done && x.due && x.due < t).sort((a, b) => a.due.localeCompare(b.due)) : [];
+  const visits = visitsOn(sel), tasks = tasksOn(sel);
+  const undated = state.tasks.filter((x) => !x.done && !x.due);
+  const label = sel === t ? "Today" : sel === addDays(t, 1) ? "Tomorrow" : new Date(sel + "T00:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+  return `${banner()}${strip}
+  <div class="section-head"><h2 class="day-title">${esc(label)}</h2><input type="date" class="date-jump" data-action="agenda-pick" value="${sel}" aria-label="Pick a date"></div>
+  ${overdue.length ? `<section class="section"><h3 class="group bad">Overdue</h3><div class="panel"><ul class="list">${overdue.map(taskRow).join("")}</ul></div></section>` : ""}
+  <section class="section"><h3 class="group">Visits</h3><div class="panel"><ul class="list">${visits.length ? visits.map((s) => shopRow(s, "Planned visit")).join("") : `<li class="empty">No visits planned. Set a next visit on a shop, or tell Jarvis.</li>`}</ul></div></section>
+  <section class="section"><h3 class="group">Tasks</h3><div class="panel"><ul class="list">${tasks.length ? tasks.map(taskRow).join("") : `<li class="empty">Nothing due.</li>`}</ul></div>${taskForm(null, sel)}</section>
+  ${undated.length ? `<section class="section"><h3 class="group">No date</h3><div class="panel"><ul class="list">${undated.map(taskRow).join("")}</ul></div></section>` : ""}
+  <a href="#tasks" class="link center">See all tasks</a>`;
+}
+
+/* ---------- views: more ---------- */
+function viewMore() {
+  const item = (v, icon, label, sub) => `<li><button class="item" data-action="go" data-v="${v}"><span class="tile-ic">${icon}</span><div class="grow"><div class="title">${label}</div><div class="sub">${sub}</div></div><span class="chev">${ICON.chev}</span></button></li>`;
+  const prospects = state.shops.filter((s) => s.status === "prospect").length;
+  const openTasks = state.tasks.filter((x) => !x.done).length;
+  return `${banner()}<div class="panel profile">${avatar(state.email, "ph big")}<div class="grow"><div class="title">${esc(state.email || "")}</div><div class="sub">${esc(syncText())}</div></div></div>
+  <section class="section"><h3 class="group">Insights</h3><div class="panel"><ul class="list">
+    ${item("map", ICON.map, "Map", `${state.shops.filter(hasGeo).length} of ${plural(state.shops.length, "shop")} on the map`)}
+    ${item("prospects", ICON.star, "Prospects", `${prospects} ranked by score`)}
+    ${item("market", ICON.chart, "Market share", "Back bar facings by company")}
+    ${item("catalogues", ICON.book, "Catalogues", plural(state.catalogues.length, "company"))}
+  </ul></div></section>
+  <section class="section"><h3 class="group">Work</h3><div class="panel"><ul class="list">
+    ${item("tasks", ICON.check, "All tasks", `${openTasks} open`)}
+  </ul></div></section>
+  <section class="section"><h3 class="group">App</h3><div class="panel"><ul class="list">
+    ${item("settings", ICON.gear, "Settings", "Voice language, backup, sign out")}
+  </ul></div></section>`;
+}
+function syncText() { return state.sync.online ? (state.sync.pending ? `${state.sync.pending} change(s) waiting to upload` : "All changes saved") : `Offline${state.sync.pending ? `, ${state.sync.pending} change(s) will upload later` : ""}`; }
+
+/* ---------- views: prospects ---------- */
+function viewProspects() {
+  const ranked = state.shops.filter((s) => s.status === "prospect").sort((a, b) => (scoreOf(b) ?? -1) - (scoreOf(a) ?? -1));
+  return `${banner()}<p class="muted small">Ranked by a score out of 100 from four ratings: ${CRITERIA.map((c) => c[1].toLowerCase()).join(", ")}. Set them in a shop's Edit screen.</p>
+  <div class="panel"><ul class="list">${ranked.length ? ranked.map((s, i) => shopRow(s, "", i + 1)).join("") : `<li class="empty">No prospects yet. Add a shop and set its status to Prospect.</li>`}</ul></div>`;
 }
 
 /* ---------- views: shops ---------- */
@@ -190,9 +269,8 @@ function viewShops() {
   } else body = Object.keys(groups).sort((a, b) => a === "No area" ? 1 : b === "No area" ? -1 : a.localeCompare(b)).map((a) => `<section class="section"><div class="section-head"><h2>${esc(a)}</h2><span class="muted small num">${groups[a].length}</span></div>
       <div class="panel"><ul class="list">${groups[a].sort((x, y) => (x.name || "").localeCompare(y.name || "")).map((s) => shopRow(s)).join("")}</ul></div></section>`).join("");
   return `${banner()}
-  <div class="section-head"><h1>Shops</h1>${canEdit() ? `<button class="btn primary" data-action="new-shop">Add shop</button>` : ""}</div>
-  <input id="shop-search" type="search" placeholder="Search name, area, owner" value="${esc(state.query)}" data-action="search" aria-label="Search shops">
-  <div class="chips"><button class="chip" data-action="near" aria-pressed="${!!state.near}">📍 Near me</button>${chip("all", "All")}${chip("active", "Customers")}${chip("prospect", "Prospects")}${chip("closed", "Closed down")}${chip("lost", "Lost")}</div>
+  <div class="search">${ic('<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>')}<input id="shop-search" type="search" placeholder="Search name, area, owner" value="${esc(state.query)}" data-action="search" aria-label="Search shops"></div>
+  <div class="scroller"><button class="chip" data-action="near" aria-pressed="${!!state.near}">📍 Near me</button>${chip("all", "All")}${chip("active", "Customers")}${chip("prospect", "Prospects")}${chip("closed", "Closed down")}${chip("lost", "Lost")}</div>
   <div class="scroller" role="group" aria-label="Areas">${achip("all", "All areas", byStatus.length)}${Object.keys(areaCounts).sort().map((a) => achip(a, a, areaCounts[a])).join("")}</div>
   ${body}`;
 }
@@ -222,9 +300,7 @@ function viewMap() {
     svg = `<div class="map"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Map of your shops by GPS position"><rect class="frame" x="0" y="0" width="${W}" height="${H}" rx="10"/>${areaLbls}${dots}${state.here ? (() => { const [x, y] = xy(state.here); return `<circle class="here-ring" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="14"/><circle class="here" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="6"><title>You are here</title></circle>`; })() : ""}</svg></div>
     <div class="legend"><span><i style="background:var(--good)"></i>Customer</span><span><i style="background:var(--warn)"></i>Prospect</span><span><i style="background:var(--bad)"></i>Closed or lost</span><span><i style="background:var(--here)"></i>You</span></div>`;
   }
-  return `${banner()}<div class="section"><span class="eyebrow">GPS view</span><h1>Shop map</h1>
-  <p class="muted small">Every shop with a saved location, placed by its GPS position. Tap a dot to open the shop, then Directions to navigate in Google Maps.</p>
-  <div class="row-actions"><button class="btn small" data-action="locate-me">📍 Show where I am</button></div></div>
+  return `${banner()}<p class="muted small">Every shop with a saved location, placed by GPS. Tap a dot to open the shop. The target button at the top shows where you are.</p>
   ${areas.length > 1 ? `<div class="scroller">${achip("all", "All areas")}${areas.map((a) => achip(a, a)).join("")}</div>` : ""}
   <div class="panel">${svg}</div>
   ${missing.length ? `<section class="section"><div class="section-head"><h2>Missing a location</h2><span class="muted small num">${missing.length}</span></div><div class="panel"><ul class="list">${missing.map((s) => shopRow(s, "No GPS yet")).join("")}</ul></div></section>` : ""}`;
@@ -251,7 +327,7 @@ function viewMarket() {
   const seg = `<div class="segmented" role="group"><button data-action="seg" data-s="share" aria-pressed="${state.marketSeg === "share"}">Market share</button><button data-action="seg" data-s="catalogues" aria-pressed="${state.marketSeg === "catalogues"}">Catalogues</button></div>`;
   if (state.marketSeg === "catalogues") {
     const cats = state.catalogues.slice().sort((a, b) => (a.company || "").localeCompare(b.company || ""));
-    return `${banner()}<h1>Market</h1>${seg}
+    return `${banner()}
     <p class="muted small">One catalogue per company. Brands you add here are recognised when you record a back bar, so each label is counted for the right company.</p>
     <div class="panel"><ul class="list">${cats.length ? cats.map((c) => { const p = (c.photos || [])[0]; return `<li><button class="item" data-action="open-cat" data-id="${esc(c.id)}">${p ? `<span class="thumb"><img ${img(p.id)} alt="" loading="lazy"></span>` : `<span class="ph">${esc((c.company || "?").charAt(0).toUpperCase())}</span>`}<div class="grow"><div class="title">${esc(c.company)}</div><div class="sub">${(c.items || []).length} products · ${(c.photos || []).length} photos</div></div></button></li>`; }).join("") : `<li class="empty">No catalogues yet. Add a company, then upload photos of its catalogue. I can type the products in from the photos.</li>`}</ul></div>
     ${adder("catalogue", "Add company catalogue", [{ name: "company", label: "Company", required: true, list: "dl-companies" }], "Add company")}`;
@@ -264,7 +340,7 @@ function viewMarket() {
   const chip = (act, attr, k, label, cur) => `<button class="chip" data-action="${act}" data-v="${esc(k)}" aria-pressed="${cur === k}">${esc(label)}</button>`;
   const brands = {}; shops.forEach((s) => (s.backbar || []).filter((b) => state.marketCat === "all" || (b.category || "Other") === state.marketCat).forEach((b) => { const k = b.brand || "?"; brands[k] = brands[k] || { f: 0, co: b.company || "", shops: new Set() }; brands[k].f += Number(b.facings) || 1; brands[k].shops.add(s.id); }));
   const topBrands = Object.entries(brands).sort((a, b) => b[1].f - a[1].f).slice(0, 12);
-  return `${banner()}<h1>Market</h1>${seg}
+  return `${banner()}
   <p class="muted small">Share of back bar facings by company, from the labels recorded in each shop. ${withData} shop${withData === 1 ? "" : "s"} with data, ${total} facings counted.</p>
   ${areas.length ? `<div class="scroller">${chip("m-area", "", "all", "All areas", state.marketArea)}${areas.map((a) => chip("m-area", "", a, a, state.marketArea)).join("")}</div>` : ""}
   ${cats.length ? `<div class="scroller">${chip("m-cat", "", "all", "All categories", state.marketCat)}${cats.map((c) => chip("m-cat", "", c, c, state.marketCat)).join("")}</div>` : ""}
@@ -276,9 +352,7 @@ function viewMarket() {
 
 function viewCatalogue(c) {
   const items = (c.items || []).slice().sort((a, b) => (a.category || "").localeCompare(b.category || "") || (a.brand || "").localeCompare(b.brand || ""));
-  return `<button class="back" data-action="back">← Catalogues</button>
-  <div class="shop-head"><span class="eyebrow">Company catalogue</span><h1>${esc(c.company)}</h1></div>
-  <section class="section"><div class="section-head"><h2>Catalogue photos</h2>${uploadBtn("cat-photo", "Add photos")}</div>
+  return `  <section class="section"><div class="section-head"><h2>Catalogue photos</h2>${uploadBtn("cat-photo", "Add photos")}</div>
     <div class="panel">${gallery((c.photos || []), "catalogues", c.id) || `<div class="empty">No photos yet. Upload pages of the catalogue and I'll type the products into the list below.</div>`}</div>${(c.photos || []).length ? readingPanel("catalogue") : ""}</section>
   <section class="section"><div class="section-head"><h2>Products</h2><span class="muted small num">${items.length}</span></div>
     <div class="panel table-wrap">${items.length ? `<table><thead><tr><th>Brand</th><th>Product</th><th>Category</th><th>Size</th><th>Price</th><th></th></tr></thead><tbody>${(c.items || []).map((it, i) => ({ it, i })).sort((a, b) => (a.it.category || "").localeCompare(b.it.category || "") || (a.it.brand || "").localeCompare(b.it.brand || "")).map(({ it, i }) => `<tr><td>${esc(it.brand)}</td><td>${esc(it.product)}</td><td class="muted">${esc(it.category)}</td><td class="num">${esc(it.size)}</td><td class="num">${esc(it.price)}</td><td class="r">${rmButton(`cat:${c.id}:items:${i}`)}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">No products listed yet.</div>`}</div>
@@ -289,8 +363,7 @@ function viewCatalogue(c) {
 /* ---------- views: settings ---------- */
 function viewSettings() {
   const vchip = (k, l) => `<button class="chip" data-action="voice-lang" data-v="${k}" aria-pressed="${state.voiceLang === k}">${l}</button>`;
-  return `<button class="back" data-action="back">← Back</button><h1>Settings</h1>
-  <section class="section"><h2>Account</h2><div class="panel"><dl class="kv"><dt>Signed in as</dt><dd>${esc(state.email || "")}</dd><dt>Sync</dt><dd>${state.sync.online ? (state.sync.pending ? `${state.sync.pending} change(s) waiting to upload` : "Up to date") : `Offline${state.sync.pending ? `, ${state.sync.pending} change(s) will upload when you're back online` : ""}`}</dd></dl></div></section>
+  return `<section class="section"><h2>Account</h2><div class="panel"><dl class="kv"><dt>Signed in as</dt><dd>${esc(state.email || "")}</dd><dt>Sync</dt><dd>${esc(syncText())}</dd></dl></div></section>
   <section class="section"><h2>Voice language</h2><div class="chips">${vchip("el-GR", "Ελληνικά")}${vchip("en-US", "English")}</div><p class="muted small">The language the Talk microphone listens for. Jarvis understands both either way.</p></section>
   <section class="section"><h2>Backup</h2><p class="muted small">Download everything (shops, tasks, visits, catalogues) as one file. Photos stay in your private storage.</p><div class="row-actions"><button class="btn" data-action="backup">Download backup</button></div></section>
   <div class="row-actions"><button class="btn danger" data-action="sign-out">Sign out</button></div>`;
@@ -300,15 +373,15 @@ function viewSettings() {
 function viewTasks() {
   const open = state.tasks.filter((t) => !t.done).sort((a, b) => (a.due || "9999").localeCompare(b.due || "9999"));
   const done = state.tasks.filter((t) => t.done).sort((a, b) => (b.doneAt || "").localeCompare(a.doneAt || ""));
-  return `${banner()}<h1>Tasks</h1>
+  return `${banner()}
   ${taskForm(null)}
   <div class="panel"><ul class="list">${open.length ? open.map(taskRow).join("") : `<li class="empty">No open tasks.</li>`}</ul></div>
   ${done.length ? `<button class="back" data-action="toggle-done">${state.showDone ? "Hide" : "Show"} ${done.length} done</button>
   ${state.showDone ? `<div class="panel"><ul class="list">${done.slice(0, 50).map(taskRow).join("")}</ul></div>` : ""}` : ""}`;
 }
-function taskForm(shopId) {
+function taskForm(shopId, due = "") {
   const opts = [["", "None"], ...state.shops.slice().sort((a, b) => (a.name || "").localeCompare(b.name || "")).map((s) => [s.id, s.name])];
-  const fields = [{ name: "title", label: "Task", required: true, ph: "e.g. Send new price list to the owner" }, { name: "due", label: "Due", type: "date" }];
+  const fields = [{ name: "title", label: "Task", required: true, ph: "e.g. Send new price list to the owner" }, { name: "due", label: "Due", type: "date", value: due }];
   if (!shopId) fields.push({ name: "shopId", label: "Shop", type: "select", options: opts });
   return adder(shopId ? `task:${shopId}` : "task", "Add task", fields, "Add task");
 }
@@ -434,15 +507,20 @@ function viewShop(s) {
   if (state.editing) return viewEdit(s);
   const c = cover(s);
   const tabs = { overview: tabOverview, photos: tabPhotos, assets: tabAssets, posm: tabPosm, backbar: tabBackbar, menu: tabMenu, consumption: tabConsumption, contacts: tabContacts, visits: tabVisits };
-  return `<button class="back" data-action="back">← Back</button>
-  <div class="cover">${c ? `<img ${img(c)} alt="Shop front of ${esc(s.name)}">` : `<div class="noimg">${canUpload() ? "No shop photo yet. Add one on the Photos tab." : "No shop photo yet."}</div>`}</div>
-  <div class="shop-head">
-    <div class="chips">${s.example ? `<span class="pill example">Example data</span>` : ""}<span class="pill ${esc(s.status)}">${esc(STATUSES[s.status] || "")}</span></div>
-    <h1>${esc(s.name || "Untitled shop")}</h1>
-    <div class="meta">${s.type ? `<span>${esc(s.type)}</span>` : ""}${s.area ? `<span>${esc(s.area)}</span>` : ""}${s.status === "prospect" && scoreOf(s) != null ? `<span>Score <b class="num">${scoreOf(s)}</b>/100</span>` : ""}</div>
+  const phone = (s.contacts || []).map((x) => x.phone).find(Boolean);
+  return `<div class="shop-hero ${c ? "" : "noimg"}">${c ? `<img ${img(c)} alt="Shop front of ${esc(s.name)}">` : avatar(s.name, "hero-av")}
+    <div class="shop-hero-text">
+      <div class="chips">${s.example ? `<span class="pill example">Example data</span>` : ""}<span class="pill solid ${esc(s.status)}">${esc(STATUSES[s.status] || "")}</span></div>
+      <h1>${esc(s.name || "Untitled shop")}</h1>
+      <div class="meta">${s.type ? `<span>${esc(s.type)}</span>` : ""}${s.area ? `<span>${esc(s.area)}</span>` : ""}${s.status === "prospect" && scoreOf(s) != null ? `<span>Score <b class="num">${scoreOf(s)}</b>/100</span>` : ""}</div>
+    </div></div>
+  <div class="actions4">
+    <a class="act" href="${mapsDir(s)}" target="_blank" rel="noopener"><span class="act-ic">${ICON.nav}</span>Directions</a>
+    ${phone ? `<a class="act" href="tel:${esc(phone.replace(/\s/g, ""))}"><span class="act-ic">${ICON.phone}</span>Call</a>` : `<button class="act" data-action="shop-tab" data-v="contacts"><span class="act-ic">${ICON.phone}</span>Contacts</button>`}
+    <button class="act" data-action="talk"><span class="act-ic">${ICON.mic}</span>Debrief</button>
+    <button class="act" data-action="shop-tab" data-v="photos"><span class="act-ic">${ICON.camera}</span>Photos</button>
   </div>
-  <div class="row-actions"><a class="btn primary" href="${mapsDir(s)}" target="_blank" rel="noopener">Directions</a><a class="btn" href="${mapsSearch(s)}" target="_blank" rel="noopener">Open in Google Maps</a></div>
-  <div class="scroller" role="tablist" aria-label="Shop sections">${SHOP_TABS.map(([k, l]) => `<button class="chip" role="tab" data-action="shop-tab" data-v="${k}" aria-pressed="${state.shopTab === k}" aria-selected="${state.shopTab === k}">${l}</button>`).join("")}</div>
+  <div class="tabbar" role="tablist" aria-label="Shop sections">${SHOP_TABS.map(([k, l]) => `<button class="tab" role="tab" data-action="shop-tab" data-v="${k}" aria-selected="${state.shopTab === k}">${l}</button>`).join("")}</div>
   ${tabs[state.shopTab](s)}`;
 }
 
@@ -450,9 +528,7 @@ function viewEdit(s) {
   const isNew = !s.id;
   const F = "shop";
   const f = (name, label, type = "text", extra = {}) => fld({ form: F, name, label, type, value: s[name], ...extra });
-  return `<button class="back" data-action="${isNew ? "back" : "cancel-edit"}">← Cancel</button>
-  <h1>${isNew ? "New shop" : "Edit " + esc(s.name)}</h1>
-  <form class="section" data-form="shop">
+  return `<form class="section" data-form="shop">
     <div class="panel inline-form">
       ${f("name", "Shop name", "text", { required: true })}
       <div class="grid2">
@@ -473,7 +549,7 @@ function viewEdit(s) {
     <div class="panel inline-form">${fld({ form: F, name: "insideInfo", label: "Inside info", type: "textarea", value: s.insideInfo })}
       ${fld({ form: F, name: "pricingNotes", label: "Pricing notes (discounts, terms, competitor offers)", type: "textarea", value: s.pricingNotes })}</div>
     <div class="panel inline-form"><h2>Prospect rating (0 to 5)</h2><div class="grid2">${CRITERIA.map(([k, l]) => fld({ form: F, name: "sc_" + k, label: l, type: "number", value: (s.scores || {})[k], attrs: 'min="0" max="5" step="1"' })).join("")}</div></div>
-    <div class="row-actions"><button class="btn primary" type="submit">Save shop</button>${isNew ? "" : rmButton(`shopdoc:${s.id}`, "Delete shop")}</div>
+    <div class="row-actions"><button class="btn primary" type="submit">Save shop</button><button class="btn" type="button" data-action="${isNew ? "back" : "cancel-edit"}">Cancel</button>${isNew ? "" : rmButton(`shopdoc:${s.id}`, "Delete shop")}</div>
   </form>`;
 }
 
@@ -513,7 +589,9 @@ document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && state.
 
 /* ---------- render ---------- */
 function render() {
-  document.querySelectorAll("nav.tabs a").forEach((a) => a.setAttribute("aria-current", a.dataset.tab === state.view ? "page" : "false"));
+  const tab = TABS.includes(state.view) ? state.view : PARENT[state.view];
+  document.querySelectorAll("nav.tabs a").forEach((a) => a.setAttribute("aria-current", a.dataset.tab === tab ? "page" : "false"));
+  renderChrome();
   const overdue = state.tasks.filter((t) => !t.done && t.due && t.due <= todayISO()).length;
   document.getElementById("task-badge").innerHTML = overdue ? `<span class="badge">${overdue}</span>` : "";
   const ready = state.noDb || (state.loaded.shops && state.loaded.tasks);
@@ -525,12 +603,33 @@ function render() {
   } else if (state.catId) {
     const c = catById(state.catId);
     html = c ? viewCatalogue(c) : `<button class="back" data-action="back">← Back</button><p class="muted">That catalogue was removed.</p>`;
-  } else html = { today: viewToday, shops: viewShops, map: viewMap, market: viewMarket, tasks: viewTasks, settings: viewSettings }[state.view]();
+  } else {
+    if (state.view === "market" || state.view === "catalogues") state.marketSeg = state.view === "market" ? "share" : "catalogues";
+    html = { today: viewToday, shops: viewShops, agenda: viewAgenda, more: viewMore, map: viewMap, prospects: viewProspects, market: viewMarket, catalogues: viewMarket, tasks: viewTasks, settings: viewSettings }[state.view]();
+  }
   const openAdders = [...app.querySelectorAll("details.adder[open] form")].map((f) => f.dataset.form);
   app.innerHTML = html + datalists();
   openAdders.forEach((k) => { const f = app.querySelector(`form[data-form="${CSS.escape(k)}"]`); if (f) f.closest("details").open = true; });
   if (state.focusSearch) { const el = document.getElementById("shop-search"); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } state.focusSearch = false; }
   renderLightbox();
+}
+function renderChrome() {
+  let title = TITLES[state.view] || "Jarvis", eyebrow = "", back = !!PARENT[state.view], actions = "";
+  if (state.shopId) {
+    const s = state.shopId === "new" ? null : shopById(state.shopId);
+    back = true;
+    if (state.shopId === "new") title = "New shop";
+    else if (state.editing) { title = "Edit shop"; eyebrow = s ? s.name : ""; }
+    else { title = "Shop"; if (s && canEdit()) actions = iconBtn("edit", "Edit shop", ICON.edit); }
+  } else if (state.catId) { const c = catById(state.catId); title = c ? c.company : "Catalogue"; eyebrow = "Catalogue"; back = true; }
+  else if (state.view === "today") { eyebrow = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" }); title = greeting(); }
+  else if (state.view === "shops") actions = iconBtn("go", "Map", ICON.map, "map") + (canEdit() ? iconBtn("new-shop", "Add shop", ICON.plus) : "");
+  else if (state.view === "map") actions = iconBtn("locate-me", "Show where I am", ICON.locate);
+  document.getElementById("hdr-title").textContent = title;
+  document.getElementById("hdr-eyebrow").textContent = eyebrow;
+  document.getElementById("hdr-back").hidden = !back;
+  document.getElementById("hdr-actions").innerHTML = actions;
+  document.querySelector("header.top").classList.toggle("home", state.view === "today" && !state.shopId && !state.catId);
 }
 function safeRender() { if (state.editing || state.dirty || state.busy) { state.pending = true; return; } render(); }
 function settle() { state.dirty = false; state.pending = false; render(); }
@@ -566,14 +665,23 @@ async function pushTo(coll, id, field, item) {
 }
 
 /* ---------- events ---------- */
-app.addEventListener("click", async (ev) => {
+async function onAction(ev) {
   const el = ev.target.closest("[data-action]");
   if (!el) return;
   const a = el.dataset.action;
   if (a === "open") { ev.preventDefault(); openShop(el.dataset.id); }
   else if (a === "open-cat") openCat(el.dataset.id);
-  else if (a === "back" && state.view === "settings" && !state.shopId) go("today");
-  else if (a === "back") { if (state.catId) { state.catId = null; state.marketSeg = "catalogues"; settle(); } else go(state.view); }
+  else if (a === "back") {
+    if (state.shopId && state.editing && state.shopId !== "new") { state.editing = false; state.armed = null; settle(); }
+    else if (state.catId) { state.catId = null; settle(); }
+    else if (state.shopId) go(state.view);
+    else nav(PARENT[state.view] || "today");
+  }
+  else if (a === "go") { ev.preventDefault(); nav(el.dataset.v); }
+  else if (a === "talk") openTalk();
+  else if (a === "shop-filter") { Object.assign(state, { shopFilter: el.dataset.v, areaFilter: "all", near: false }); nav("shops"); }
+  else if (a === "near-go") { state.shopFilter = "all"; state.areaFilter = "all"; nav("shops"); locate().then(() => { state.near = true; render(); }).catch(() => {}); }
+  else if (a === "agenda-day") { state.agendaDay = el.dataset.v; render(); }
   else if (a === "filter") { state.shopFilter = el.dataset.f; render(); }
   else if (a === "area") { state.areaFilter = el.dataset.a; render(); }
   else if (a === "seg") { state.marketSeg = el.dataset.s; render(); }
@@ -593,9 +701,9 @@ app.addEventListener("click", async (ev) => {
   }
   else if (a === "lightbox-one") { state.lightbox = { list: [{ id: el.dataset.pid }], index: 0 }; renderLightbox(); }
   else if (a === "near") { if (state.near) { state.near = false; render(); } else { el.textContent = "Finding you…"; locate().then(() => { state.near = true; render(); }).catch(() => { el.textContent = "📍 Location blocked"; }); } }
-  else if (a === "locate-me") { el.textContent = "Finding you…"; locate().then(render).catch(() => { el.textContent = "Location blocked. Allow it in your phone settings."; }); }
+  else if (a === "locate-me") { el.classList.add("busy"); locate().then(render).catch(() => { el.classList.remove("busy"); alert("Location is blocked. Allow it for this app in your phone settings."); }); }
   else if (a === "use-gps") { const note = document.getElementById("gps-note"); note.textContent = "Finding you…"; locate().then((h) => { document.getElementById("f-shop-location").value = `${h.lat.toFixed(6)}, ${h.lng.toFixed(6)}`; note.textContent = `Got it, accurate to about ${Math.round(h.acc)} m.`; state.dirty = true; }).catch(() => { note.textContent = "Couldn't get your location. Allow location for this app in your phone settings."; }); }
-  else if (a === "settings") { Object.assign(state, { view: "settings", shopId: null, catId: null, editing: false }); render(); window.scrollTo(0, 0); }
+  else if (a === "settings") nav("settings");
   else if (a === "sign-out") { await sb.auth.signOut(); location.reload(); }
   else if (a === "backup") { const data = JSON.stringify({ exportedAt: new Date().toISOString(), docs: store.exportAll() }, null, 1); const a2 = document.createElement("a"); a2.href = URL.createObjectURL(new Blob([data], { type: "application/json" })); a2.download = `jarvis-backup-${todayISO()}.json`; a2.click(); }
   else if (a === "voice-lang") { state.voiceLang = el.dataset.v; try { localStorage.setItem("jarvis-voice-lang", state.voiceLang); } catch {} render(); }
@@ -617,10 +725,13 @@ app.addEventListener("click", async (ev) => {
     if (removed && removed.photoId && state.assets) state.assets.delete(removed.photoId).catch(() => {});
     settle();
   }
-});
+}
+app.addEventListener("click", onAction);
+document.querySelector("header.top").addEventListener("click", onAction);
 
 app.addEventListener("change", async (ev) => {
   const el = ev.target;
+  if (el.dataset.action === "agenda-pick") { if (el.value) { state.agendaDay = el.value; render(); } return; }
   if (el.dataset.action === "toggle-task") {
     const done = el.checked;
     await guarded(() => state.db.doc("tasks/" + el.dataset.id).update({ done, doneAt: done ? new Date().toISOString() : "" }));
@@ -867,7 +978,8 @@ talkRoot.addEventListener("click", (ev) => {
   else if (a === "close") { if (rec && state.talk.listening) rec.stop(); state.talk = null; renderTalk(); }
   else if (a === "save") { b.disabled = true; talkSave(); }
 });
-document.getElementById("fab").addEventListener("click", () => { state.talk = { open: true, text: "" }; renderTalk(); locate().catch(() => {}); });
+function openTalk() { state.talk = { open: true, text: "" }; renderTalk(); locate().catch(() => {}); }
+document.getElementById("fab").addEventListener("click", openTalk);
 
 /* read labels / catalogue pages from photos */
 async function readPhotos(kind) {
