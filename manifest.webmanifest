@@ -1,7 +1,8 @@
 {
   "name": "Jarvis Field Book",
   "short_name": "Jarvis",
-  "description": "Shops, visits, POSM, back bars and market share for HoReCa field sales.",
+  "description": "Μαγαζιά, επισκέψεις, POSM, back bar και μερίδιο αγοράς για πωλήσεις HoReCa.",
+  "lang": "el",
   "start_url": "./#today",
   "scope": "./",
   "display": "standalone",
