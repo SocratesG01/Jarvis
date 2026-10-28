@@ -792,7 +792,7 @@ function renderTalk() {
     ${t.error ? `<div class="banner" role="alert">${esc(t.error)}</div>` : ""}
     <div class="row-actions"><button class="btn primary" data-talk="send">Send to Jarvis</button><button class="btn" data-talk="close">Cancel</button></div>`;
   talkRoot.innerHTML = `<div class="sheet-bg"><div class="sheet" role="dialog" aria-label="Talk to Jarvis"><div class="section-head"><h2>Talk to Jarvis</h2>${state.shopId && shopById(state.shopId) ? `<span class="muted small">${esc(shopById(state.shopId).name)}</span>` : ""}</div>${body}</div></div>`;
-  const ta = document.getElementById("talk-text"); if (ta && !t.result) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+  const ta = document.getElementById("talk-text"); if (ta && !t.result && !t.listening && !Rec) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
 }
 const sampleErr = (e) => ({ not_granted: "Jarvis needs your permission to use Claude. Tap Send again and choose Allow.", rate_limited: "Too many requests at once. Wait a minute and try again.", invalid_json: "I didn't understand that. Try saying it again more simply.", prompt_too_large: "Your data has grown too big to send in one go. Tell Claude in the chat instead.", session_expired: "You've been signed out. Reload the app.", offline: "You're offline. Your words are kept here; send them when you have signal.", ai_error: "Jarvis couldn't reach Claude. Check the connection and try again.", refused: "Claude declined that request. Try rephrasing it." }[e && e.code] || "Something went wrong. Try again.");
 async function talkSend() {
@@ -832,17 +832,29 @@ async function talkSave() {
 }
 const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
 let rec = null;
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const MIC_ERRORS = {
+  "not-allowed": "Jarvis isn't allowed to use the microphone. Allow it in your phone's settings, or tap the 🎤 on your keyboard instead.",
+  "service-not-allowed": "Your phone doesn't let installed web apps use speech recognition. Tap the box below and use the 🎤 on your keyboard instead.",
+  "audio-capture": "No microphone found. Tap the box below and use the 🎤 on your keyboard instead.",
+  "network": "Speech recognition needs internet. Check your connection, or use the 🎤 on your keyboard.",
+  "language-not-supported": "Your phone can't recognise this language here. Switch the voice language in Settings, or use the 🎤 on your keyboard.",
+  "no-speech": "I didn't hear anything. Tap the button and start talking straight away.",
+};
 function toggleMic() {
   const t = state.talk;
   if (t.listening) { rec && rec.stop(); return; }
   const ta = document.getElementById("talk-text");
   const base = ta ? ta.value.trim() : "";
-  rec = new Rec(); rec.lang = state.voiceLang; rec.continuous = true; rec.interimResults = true;
-  let finalText = "";
-  rec.onresult = (e) => { let interim = ""; for (let i = e.resultIndex; i < e.results.length; i++) { if (e.results[i].isFinal) finalText += e.results[i][0].transcript + " "; else interim += e.results[i][0].transcript; } const box = document.getElementById("talk-text"); if (box) box.value = [base, finalText + interim].filter(Boolean).join(" ").trim(); };
-  rec.onend = () => { const box = document.getElementById("talk-text"); t.text = box ? box.value : t.text; t.listening = false; renderTalk(); };
-  rec.onerror = (e) => { t.error = e.error === "not-allowed" ? "Microphone blocked. Allow it for this app in your phone settings, or use the keyboard mic." : ""; };
-  t.listening = true; t.text = base; renderTalk(); rec.start();
+  let finalText = "", heard = false;
+  try {
+    rec = new Rec(); rec.lang = state.voiceLang; rec.continuous = !isIOS; rec.interimResults = true;
+  } catch { t.error = MIC_ERRORS["service-not-allowed"]; renderTalk(); return; }
+  rec.onresult = (e) => { heard = true; let interim = ""; for (let i = e.resultIndex; i < e.results.length; i++) { if (e.results[i].isFinal) finalText += e.results[i][0].transcript + " "; else interim += e.results[i][0].transcript; } const box = document.getElementById("talk-text"); if (box) box.value = [base, finalText + interim].filter(Boolean).join(" ").trim(); };
+  rec.onerror = (e) => { t.error = MIC_ERRORS[e.error] || (e.error === "aborted" ? "" : `The microphone stopped (${e.error}). Use the 🎤 on your keyboard instead.`); };
+  rec.onend = () => { const box = document.getElementById("talk-text"); t.text = box ? box.value : t.text; t.listening = false; if (!heard && !t.error) t.error = MIC_ERRORS["no-speech"]; renderTalk(); };
+  t.listening = true; t.text = base; t.error = ""; renderTalk();
+  try { rec.start(); } catch (e) { t.listening = false; t.error = MIC_ERRORS["service-not-allowed"]; renderTalk(); }
 }
 talkRoot.addEventListener("click", (ev) => {
   const b = ev.target.closest("[data-talk]");
