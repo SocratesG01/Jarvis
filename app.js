@@ -85,9 +85,9 @@ function datalists() {
 
 /* ---------- navigation ---------- */
 const TABS = ["today", "shops", "agenda", "more"];
-const PARENT = { map: "more", prospects: "more", market: "more", catalogues: "more", tasks: "agenda", settings: "more", route: "agenda", report: "more", alerts: "today" };
+const PARENT = { map: "more", prospects: "more", market: "more", catalogues: "more", tasks: "agenda", settings: "more", route: "agenda", report: "more", alerts: "today", files: "more", watch: "more" };
 const PAGES = [...TABS, ...Object.keys(PARENT)];
-const TITLES = { today: "Jarvis", shops: "Μαγαζιά", agenda: "Ατζέντα", more: "Άλλα", map: "Χάρτης", prospects: "Υποψήφιοι", market: "Μερίδιο αγοράς", catalogues: "Κατάλογοι", tasks: "Όλες οι εργασίες", settings: "Ρυθμίσεις", route: "Διαδρομή ημέρας", report: "Εβδομαδιαία αναφορά", alerts: "Ειδοποιήσεις" };
+const TITLES = { today: "Jarvis", shops: "Μαγαζιά", agenda: "Ατζέντα", more: "Άλλα", map: "Χάρτης", prospects: "Υποψήφιοι", market: "Μερίδιο αγοράς", catalogues: "Κατάλογοι", tasks: "Όλες οι εργασίες", settings: "Ρυθμίσεις", route: "Διαδρομή ημέρας", report: "Εβδομαδιαία αναφορά", alerts: "Ειδοποιήσεις", files: "Αρχεία δουλειάς", watch: "Παρακολούθηση αγοράς" };
 function nav(view) { if (location.hash.slice(1) === view) go(view); else location.hash = view; }
 function go(view) { Object.assign(state, { reading: null, view, shopId: null, catId: null, editing: false, armed: null, dirty: false }); render(); window.scrollTo(0, 0); }
 function openShop(id, opts = {}) { Object.assign(state, { reading: null, shopId: id, catId: null, editing: !!opts.edit, armed: null, dirty: false, shopTab: opts.tab || "overview", consProduct: null }); render(); window.scrollTo(0, 0); }
@@ -288,6 +288,7 @@ function jarvisSuggestion() {
 function viewToday() {
   const t = todayISO();
   loadWeather();
+  loadCalendar();
   const name = state.settings.myName ?? "Σωκράτη";
   const open = state.tasks.filter((x) => !x.done);
   const overdue = open.filter((x) => x.due && x.due < t);
@@ -302,9 +303,10 @@ function viewToday() {
   const card = (action, v, icon, n, label, sub, extra = "") => `<button class="jx-stat" data-action="${action}" data-v="${v}"><span class="jx-ic">${icon}</span><b>${n}</b><span class="jx-label">${label}</span>${extra}<span class="jx-sub2">${sub}</span></button>`;
   const todayTasks = open.filter((x) => x.due === t);
   const rows = [
-    ...overdue.map((x) => ({ kind: "late", x })), ...planned.map((s) => ({ kind: "visit", s })), ...todayTasks.map((x) => ({ kind: "task", x })),
+    ...calOn(t).map((e) => ({ kind: "cal", e })), ...overdue.map((x) => ({ kind: "late", x })), ...planned.map((s) => ({ kind: "visit", s })), ...todayTasks.map((x) => ({ kind: "task", x })),
   ].slice(0, 6);
   const row = (r) => {
+    if (r.kind === "cal") return `<li><button class="jx-row" data-action="go" data-v="agenda"><i class="d cal"></i><span class="jx-when">${esc(r.e.time || "Όλη μέρα")}</span><span class="jx-what"><b>${esc(r.e.title)}</b><small>${esc(r.e.where || "Ημερολόγιο")}</small></span><span class="chev">${ICON.chev}</span></button></li>`;
     if (r.kind === "visit") return `<li><button class="jx-row" data-action="open" data-id="${esc(r.s.id)}"><i class="d visit"></i><span class="jx-when">Επίσκεψη</span><span class="jx-what"><b>${esc(r.s.name)}</b><small>${esc([tr(r.s.type), r.s.area].filter(Boolean).join(" · "))}</small></span><span class="chev">${ICON.chev}</span></button></li>`;
     const sh = r.x.shopId ? shopById(r.x.shopId) : null;
     return `<li><button class="jx-row" ${sh ? `data-action="open" data-id="${esc(sh.id)}"` : `data-action="go" data-v="agenda"`}><i class="d ${r.kind}"></i><span class="jx-when">${r.kind === "late" ? "Εκπρόθ." : "Εργασία"}</span><span class="jx-what"><b>${esc(r.x.title)}</b><small>${esc(sh ? sh.name : "Χωρίς μαγαζί")}</small></span><span class="chev">${ICON.chev}</span></button></li>`;
@@ -358,9 +360,10 @@ function viewAgenda() {
   const t = todayISO(), sel = state.agendaDay || t;
   const days = Array.from({ length: 21 }, (_, i) => addDays(t, i - 1));
   if (!days.includes(sel)) days.push(sel);
+  loadCalendar();
   const visitsOn = (day) => state.shops.filter((s) => s.nextVisit === day);
   const tasksOn = (day) => state.tasks.filter((x) => !x.done && x.due === day);
-  const strip = `<div class="daystrip" role="group" aria-label="Ημέρες">${days.map((day) => { const dt = new Date(day + "T00:00:00"); const n = visitsOn(day).length + tasksOn(day).length; return `<button class="day ${day === t ? "today" : ""}" data-action="agenda-day" data-v="${day}" aria-pressed="${day === sel}"><span>${dt.toLocaleDateString("el-GR", { weekday: "short" })}</span><b>${dt.getDate()}</b><i class="${n ? "on" : ""}"></i></button>`; }).join("")}</div>`;
+  const strip = `<div class="daystrip" role="group" aria-label="Ημέρες">${days.map((day) => { const dt = new Date(day + "T00:00:00"); const n = visitsOn(day).length + tasksOn(day).length + calOn(day).length; return `<button class="day ${day === t ? "today" : ""}" data-action="agenda-day" data-v="${day}" aria-pressed="${day === sel}"><span>${dt.toLocaleDateString("el-GR", { weekday: "short" })}</span><b>${dt.getDate()}</b><i class="${n ? "on" : ""}"></i></button>`; }).join("")}</div>`;
   const overdue = sel === t ? state.tasks.filter((x) => !x.done && x.due && x.due < t).sort((a, b) => a.due.localeCompare(b.due)) : [];
   const visits = visitsOn(sel), tasks = tasksOn(sel);
   const undated = state.tasks.filter((x) => !x.done && !x.due);
@@ -369,6 +372,7 @@ function viewAgenda() {
   <button class="panel route-cta" data-action="go" data-v="route"><span class="tile-ic">${ICON.route}</span><span class="grow"><b>Διαδρομή ημέρας</b><small>Διάλεξε μαγαζιά, ο Jarvis βρίσκει την καλύτερη σειρά</small></span><span class="chev">${ICON.chev}</span></button>
   <div class="section-head"><h2 class="day-title">${esc(label)}</h2><input type="date" class="date-jump" data-action="agenda-pick" value="${sel}" aria-label="Διάλεξε ημερομηνία"></div>
   ${overdue.length ? `<section class="section"><h3 class="group bad">Εκπρόθεσμες</h3><div class="panel"><ul class="list">${overdue.map(taskRow).join("")}</ul></div></section>` : ""}
+  ${calOn(sel).length ? `<section class="section"><h3 class="group">Ημερολόγιο</h3><div class="panel"><ul class="list">${calOn(sel).map(calRow).join("")}</ul></div></section>` : ""}
   <section class="section"><h3 class="group">Επισκέψεις</h3><div class="panel"><ul class="list">${visits.length ? visits.map((s) => shopRow(s, "Προγραμματισμένη επίσκεψη")).join("") : emptyLi("calendar", "Καμία επίσκεψη. Όρισε επόμενη επίσκεψη σε ένα μαγαζί ή πες το στον Jarvis.")}</ul></div></section>
   <section class="section"><h3 class="group">Εργασίες</h3><div class="panel"><ul class="list">${tasks.length ? tasks.map(taskRow).join("") : emptyLi("tasks", "Τίποτα για αυτή τη μέρα.")}</ul></div>${taskForm(null, sel)}</section>
   ${undated.length ? `<section class="section"><h3 class="group">Χωρίς ημερομηνία</h3><div class="panel"><ul class="list">${undated.map(taskRow).join("")}</ul></div></section>` : ""}
@@ -386,15 +390,17 @@ function viewMore() {
     ${item("prospects", ICON.star, "Υποψήφιοι", `${prospects} με κατάταξη βαθμολογίας`)}
     ${item("market", ICON.chart, "Μερίδιο αγοράς", "Φιάλες στο back bar ανά εταιρεία")}
     ${item("catalogues", ICON.book, "Κατάλογοι", plural(state.catalogues.length, "εταιρεία", "εταιρείες"))}
+    ${item("watch", ICON.star, "Παρακολούθηση αγοράς", "Νέα ανοίγματα και κλεισίματα στην περιοχή σου")}
   </ul></div></section>
   <section class="section"><h3 class="group">Δουλειά</h3><div class="panel"><ul class="list">
     ${item("route", ICON.route, "Διαδρομή ημέρας", "Η καλύτερη σειρά για τις επισκέψεις σου")}
     ${item("report", ICON.report, "Εβδομαδιαία αναφορά", "Έτοιμη να τη στείλεις")}
     ${item("alerts", ICON.bell, "Ειδοποιήσεις", `${urgentCount()} εκκρεμότητες`)}
+    ${item("files", ICON.report, "Αρχεία δουλειάς", "Excel, CSV ή PDF στα σωστά μαγαζιά")}
     ${item("tasks", ICON.check, "Όλες οι εργασίες", `${openTasks} ανοιχτές`)}
   </ul></div></section>
   <section class="section"><h3 class="group">Εφαρμογή</h3><div class="panel"><ul class="list">
-    ${item("settings", ICON.gear, "Ρυθμίσεις", "Γλώσσα φωνής, αντίγραφο ασφαλείας, αποσύνδεση")}
+    ${item("settings", ICON.gear, "Ρυθμίσεις", "Ημερολόγιο, γλώσσα φωνής, αντίγραφο ασφαλείας")}
   </ul></div></section>`;
 }
 function syncText() { return state.sync.online ? (state.sync.pending ? `${state.sync.pending} αλλαγές περιμένουν να ανέβουν` : "Όλες οι αλλαγές αποθηκεύτηκαν") : `Εκτός σύνδεσης${state.sync.pending ? `, ${state.sync.pending} αλλαγές θα ανέβουν αργότερα` : ""}`; }
@@ -548,6 +554,211 @@ function notifyDaily() {
   } catch {}
 }
 
+/* ---------- work files (Excel, CSV, PDF) ---------- */
+let xlsxLib = null;
+function loadXlsx() {
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  return xlsxLib || (xlsxLib = new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"; sc.onload = () => res(window.XLSX); sc.onerror = () => { xlsxLib = null; rej({ code: "offline" }); }; document.head.appendChild(sc); }));
+}
+const MAX_FILE_TEXT = 350000;
+async function fileToInput(file) {
+  const name = file.name || "αρχείο", low = name.toLowerCase();
+  if (low.endsWith(".pdf") || file.type === "application/pdf") {
+    if (file.size > 25 * 1024 * 1024) throw { code: "file_big" };
+    return { name, documents: [file], text: "" };
+  }
+  let text;
+  if (/\.(xlsx|xlsm|xls|ods)$/.test(low)) {
+    const X = await loadXlsx(); const wb = X.read(await file.arrayBuffer(), { type: "array", cellDates: true });
+    text = wb.SheetNames.map((n) => `### Sheet: ${n}\n` + X.utils.sheet_to_csv(wb.Sheets[n], { blankrows: false })).join("\n\n");
+  } else text = await file.text();
+  if (text.length > MAX_FILE_TEXT) throw { code: "file_big" };
+  return { name, documents: [], text };
+}
+function filePrompt(inp, note) {
+  const companies = [...new Set(state.catalogues.map((c) => c.company))];
+  return `You help a HoReCa field sales rep in Athens file a work document (price list, consumption report, customer list, catalogue, etc.) into their app. Today is ${todayISO()}.
+${note ? `The rep says about this file: """${note}"""\n` : ""}
+Known shops: ${JSON.stringify(digest(false))}
+Known company catalogues: ${JSON.stringify(companies)}
+Shop status meanings: active = our customer, az = an ΑΖ shop, competitor = works with the competition, prospect = possible new customer, closed, lost.
+
+Match rows to known shops by name (allow Greek/Latin spellings and small differences). Reply with only one JSON object:
+{
+ "summary": "2-3 sentences in Greek: what this file is and what you will save",
+ "updates": [{
+   "shopId": "id of the matching known shop, or null",
+   "newShop": {"name":"","type":"${TYPES.join("|")}","area":"","city":"Athens","address":"","status":"active|az|competitor|prospect"} or null (only for shops not in the list, and only if the file is a customer/prospect list),
+   "fields": {"owner":"","address":"","area":"","status":"","nextVisit":"YYYY-MM-DD","investAmount":0,"insideInfoAdd":"","pricingNotesAdd":""},
+   "contacts": [{"name":"","role":"","phone":"","email":"","notes":""}],
+   "products": [{"name":"","price":"our price/terms","menuPrice":"their menu price","notes":""}],
+   "consumption": [{"month":"YYYY-MM","product":"","qty":0,"unit":""}],
+   "assets": [{"type":"${ASSET_TYPES.join("|")}","brand":"","serial":"","qty":"1","notes":""}],
+   "posm": [{"type":"${POSM_TYPES.join("|")}","brand":"","qty":"1","notes":""}]
+ }],
+ "catalogue": {"company":"","items":[{"brand":"","product":"","category":"${CATEGORIES.join("|")}","size":"","price":""}]} or null (only if the file is a supplier price list / catalogue not tied to one shop)
+}
+Omit empty fields. Only include what the file actually says; never invent numbers. Keep field names and type/category values exactly as listed. At most 80 updates.
+${inp.text ? `\nFile "${inp.name}":\n"""\n${inp.text}\n"""` : `\nThe file "${inp.name}" is attached as a PDF.`}`;
+}
+async function readFile(file, note) {
+  state.fileJob = { name: file.name, busy: true }; render();
+  try {
+    const inp = await fileToInput(file);
+    const r = await state.sample.json(filePrompt(inp, note), { documents: inp.documents, cache: false });
+    if (!r || typeof r !== "object") throw { code: "invalid_json" };
+    r.updates = (r.updates || []).filter((u) => (u.shopId && shopById(u.shopId)) || u.newShop);
+    state.fileJob = { name: file.name, result: r };
+  } catch (e) {
+    state.fileJob = { name: file.name, error: e && e.code === "file_big" ? "Το αρχείο είναι πολύ μεγάλο για μία φορά. Χώρισέ το σε μικρότερα (π.χ. ένα φύλλο ή λίγες σελίδες τη φορά)." : e && e.code === "invalid_json" ? "Δεν βρήκα κάτι να περάσω από αυτό το αρχείο." : sampleErr(e) };
+  }
+  render();
+}
+const updLine = (u) => { const n = (k) => (u[k] || []).length; return [u.newShop ? "νέο μαγαζί" : "", Object.keys(u.fields || {}).filter((k) => u.fields[k]).length ? "στοιχεία" : "", n("products") && plural(n("products"), "προϊόν/τιμή", "προϊόντα/τιμές"), n("consumption") && plural(n("consumption"), "γραμμή κατανάλωσης", "γραμμές κατανάλωσης"), n("contacts") && plural(n("contacts"), "επαφή", "επαφές"), n("assets") && plural(n("assets"), "εξοπλισμός", "εξοπλισμοί"), n("posm") && "POSM " + n("posm")].filter(Boolean).join(", "); };
+async function fileSave() {
+  const r = state.fileJob.result, stamp = new Date().toISOString();
+  state.busy = true; state.fileJob.saving = true; render();
+  const ok = await guarded(async () => {
+    for (const u of r.updates) await applyUpdate({ ...u, source: "file" }, stamp);
+    if (r.catalogue && r.catalogue.company && (r.catalogue.items || []).length) {
+      const ex = state.catalogues.find((c) => (c.company || "").toLowerCase() === r.catalogue.company.toLowerCase());
+      if (ex) await state.db.doc("catalogues/" + ex.id).update({ items: [...(ex.items || []), ...r.catalogue.items] });
+      else await state.db.collection("catalogues").doc().set({ company: r.catalogue.company, items: r.catalogue.items, photos: [], createdAt: stamp });
+    }
+  });
+  state.busy = false;
+  state.fileJob = ok ? { name: state.fileJob.name, saved: `Αποθηκεύτηκαν ${plural(r.updates.length, "μαγαζί", "μαγαζιά")}${r.catalogue && r.catalogue.company ? ` και ο κατάλογος ${r.catalogue.company}` : ""}.` } : { ...state.fileJob, saving: false };
+  settle();
+}
+function viewFiles() {
+  const j = state.fileJob;
+  const nm = (u) => u.newShop ? u.newShop.name : (shopById(u.shopId) || {}).name;
+  let body = "";
+  if (j && j.busy) body = `<div class="panel notice"><span class="spinner"></span><div class="grow"><b>Διαβάζω το «${esc(j.name)}»…</b><div class="sub">Μπορεί να πάρει ένα λεπτό για μεγάλα αρχεία.</div></div></div>`;
+  else if (j && j.error) body = `<div class="banner">${esc(j.error)}</div>`;
+  else if (j && j.saved) body = `<div class="panel notice"><div class="grow"><b>Έτοιμο ✓</b><div class="sub">${esc(j.saved)}</div></div></div>`;
+  else if (j && j.result) {
+    const r = j.result;
+    body = `<section class="section"><h2>Από το «${esc(j.name)}»</h2><div class="panel"><div class="prose">${esc(r.summary || "")}</div>
+      <ul class="list">${r.updates.map((u) => `<li class="item"><div class="grow"><div class="title">${esc(nm(u) || "")}</div><div class="sub">${esc(updLine(u))}</div></div>${u.newShop ? `<span class="pill prospect">Νέο</span>` : ""}</li>`).join("")}
+      ${r.catalogue && r.catalogue.company ? `<li class="item"><div class="grow"><div class="title">Κατάλογος ${esc(r.catalogue.company)}</div><div class="sub">${plural((r.catalogue.items || []).length, "προϊόν", "προϊόντα")}</div></div></li>` : ""}
+      ${!r.updates.length && !(r.catalogue && r.catalogue.company) ? `<li class="empty">Δεν βρήκα κάτι να περάσω.</li>` : ""}</ul></div>
+      <div class="row-actions">${r.updates.length || (r.catalogue && r.catalogue.company) ? `<button class="btn primary" data-action="file-save" ${j.saving ? "disabled" : ""}>${j.saving ? "Αποθήκευση…" : "Αποθήκευση όλων"}</button>` : ""}<button class="btn" data-action="file-cancel">Ακύρωση</button></div></section>`;
+  }
+  return `${banner()}<p class="muted small">Ανέβασε τιμοκατάλογο, αναφορά κατανάλωσης, λίστα πελατών ή κατάλογο (Excel, CSV ή PDF). Ο Jarvis βρίσκει σε ποια μαγαζιά αντιστοιχεί κάθε γραμμή και σου δείχνει τι θα αποθηκεύσει πριν το περάσει.</p>
+  ${canEdit() && state.sample && !(j && (j.busy || j.result)) ? `<div class="panel inline-form"><label class="field">Τι είναι το αρχείο; (προαιρετικό)<input id="file-note" placeholder="π.χ. κατανάλωση Σεπτεμβρίου, νέα τιμολογιακή"></label><label class="btn primary upload">${ICON.report} Διάλεξε αρχείο<input type="file" accept=".xlsx,.xls,.xlsm,.ods,.csv,.txt,.pdf,application/pdf" data-action="file-pick"></label></div>` : ""}
+  ${body}`;
+}
+
+/* ---------- calendar ---------- */
+const icsDate = (d) => d.replace(/-/g, "");
+const icsEsc = (t) => String(t || "").replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/[,;]/g, (m) => "\\" + m);
+function gcalLink(title, day, details = "", where = "") {
+  return "https://calendar.google.com/calendar/render?action=TEMPLATE&text=" + encodeURIComponent(title) + "&dates=" + icsDate(day) + "/" + icsDate(addDays(day, 1)) + "&details=" + encodeURIComponent(details) + "&location=" + encodeURIComponent(where);
+}
+function exportIcs() {
+  const t = todayISO(), L = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Jarvis//EL", "CALSCALE:GREGORIAN"];
+  const ev = (uid, day, title, desc, where) => L.push("BEGIN:VEVENT", `UID:${uid}@jarvis`, `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, "").slice(0, 15)}Z`, `DTSTART;VALUE=DATE:${icsDate(day)}`, `DTEND;VALUE=DATE:${icsDate(addDays(day, 1))}`, `SUMMARY:${icsEsc(title)}`, ...(desc ? [`DESCRIPTION:${icsEsc(desc)}`] : []), ...(where ? [`LOCATION:${icsEsc(where)}`] : []), "END:VEVENT");
+  state.shops.filter((s) => s.nextVisit && s.nextVisit >= t).forEach((s) => ev("visit-" + s.id + "-" + s.nextVisit, s.nextVisit, `Επίσκεψη: ${s.name}`, [tr(s.type), STATUSES[s.status]].filter(Boolean).join(" · "), [s.address, s.area, s.city].filter(Boolean).join(", ")));
+  state.tasks.filter((x) => !x.done && x.due && x.due >= t).forEach((x) => ev("task-" + x.id, x.due, `Εργασία: ${x.title}`, x.shopId && shopById(x.shopId) ? shopById(x.shopId).name : "", ""));
+  L.push("END:VCALENDAR");
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([L.join("\r\n")], { type: "text/calendar" })); a.download = `jarvis-${t}.ics`; a.click();
+}
+/* Reads a calendar feed into [{day, time, end, title, where}] for the next weeks (repeating events included). */
+function parseIcs(text, from, to) {
+  const lines = text.replace(/\r\n[ \t]/g, "").replace(/\n[ \t]/g, "").split(/\r?\n/);
+  const unesc = (v) => v.replace(/\\n/gi, " ").replace(/\\([,;\\])/g, "$1");
+  const parseDt = (p, v) => {
+    if (/VALUE=DATE(?!-)/.test(p) || /^\d{8}$/.test(v)) return { day: `${v.slice(0, 4)}-${v.slice(4, 6)}-${v.slice(6, 8)}`, time: "" };
+    const m = v.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(Z?)$/); if (!m) return null;
+    const d = m[7] ? new Date(Date.UTC(+m[1], m[2] - 1, +m[3], +m[4], +m[5])) : new Date(+m[1], m[2] - 1, +m[3], +m[4], +m[5]);
+    return { day: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, time: `${pad(d.getHours())}:${pad(d.getMinutes())}` };
+  };
+  const events = [], overrides = new Set(); let cur = null;
+  for (const ln of lines) {
+    if (ln === "BEGIN:VEVENT") { cur = { ex: [] }; continue; }
+    if (ln === "END:VEVENT") { if (cur && cur.start && cur.status !== "CANCELLED") events.push(cur); if (cur && cur.rid) overrides.add(cur.uid + "|" + cur.rid); cur = null; continue; }
+    if (!cur) continue;
+    const i = ln.indexOf(":"); if (i < 0) continue;
+    const [name, ...params] = ln.slice(0, i).split(";"), p = params.join(";"), v = ln.slice(i + 1);
+    if (name === "DTSTART") cur.start = parseDt(p, v);
+    else if (name === "DTEND") cur.end = parseDt(p, v);
+    else if (name === "SUMMARY") cur.title = unesc(v);
+    else if (name === "LOCATION") cur.where = unesc(v);
+    else if (name === "UID") cur.uid = v;
+    else if (name === "STATUS") cur.status = v;
+    else if (name === "RRULE") cur.rrule = Object.fromEntries(v.split(";").map((kv) => kv.split("=")));
+    else if (name === "RECURRENCE-ID") cur.rid = (parseDt(p, v) || {}).day;
+    else if (name === "EXDATE") v.split(",").forEach((x) => { const d = parseDt(p, x); if (d) cur.ex.push(d.day); });
+  }
+  const out = [], WD = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
+  for (const e of events) {
+    const base = { time: e.start.time, end: e.end && e.end.day === e.start.day ? e.end.time : "", title: e.title || "(χωρίς τίτλο)", where: e.where || "" };
+    if (!e.rrule || e.rid) { if (e.start.day >= from && e.start.day < to) out.push({ ...base, day: e.start.day }); continue; }
+    const R = e.rrule, step = Number(R.INTERVAL) || 1, until = R.UNTIL ? (parseDt("", R.UNTIL) || {}).day : null, max = Number(R.COUNT) || 1000;
+    const byday = R.BYDAY ? R.BYDAY.split(",").map((x) => WD.indexOf(x.slice(-2))) : null;
+    let n = 0;
+    for (let day = e.start.day, guard = 0; guard < 2000 && day < to && (!until || day <= until) && n < max; guard++) {
+      const dt = new Date(day + "T00:00:00");
+      let hit = true;
+      if (R.FREQ === "WEEKLY") { const wk = Math.floor(daysBetween(e.start.day, day) / 7); hit = wk % step === 0 && (byday ? byday.includes(dt.getDay()) : dt.getDay() === new Date(e.start.day + "T00:00:00").getDay()); }
+      else if (R.FREQ === "DAILY") hit = daysBetween(e.start.day, day) % step === 0;
+      else if (R.FREQ === "MONTHLY") hit = dt.getDate() === +e.start.day.slice(8) && ((dt.getFullYear() * 12 + dt.getMonth()) - (+e.start.day.slice(0, 4) * 12 + +e.start.day.slice(5, 7) - 1)) % step === 0;
+      else if (R.FREQ === "YEARLY") hit = day.slice(5) === e.start.day.slice(5);
+      else hit = day === e.start.day;
+      if (hit) { n++; if (day >= from && !e.ex.includes(day) && !overrides.has(e.uid + "|" + day)) out.push({ ...base, day }); }
+      day = addDays(day, 1);
+    }
+  }
+  return out.sort((a, b) => (a.day + (a.time || "00:00")).localeCompare(b.day + (b.time || "00:00")));
+}
+async function loadCalendar(force = false) {
+  const url = state.settings.icsUrl;
+  if (!url || !state.sample || !state.sample.ics) { state.cal = null; return; }
+  if (!force && state.cal && state.cal.url === url && Date.now() - state.cal.at < 30 * 60000) return;
+  if (state.calLoading) return;
+  state.calLoading = true;
+  try {
+    const t = todayISO(), events = parseIcs(await state.sample.ics(url), addDays(t, -7), addDays(t, 60));
+    state.cal = { url, at: Date.now(), events };
+    try { localStorage.setItem("jarvis-cal", JSON.stringify(state.cal)); } catch {}
+  } catch (e) { state.cal = { ...(state.cal || { events: [] }), url, at: Date.now(), error: e && e.code === "server_old" ? "server_old" : "load" }; }
+  state.calLoading = false; safeRender();
+}
+const calOn = (day) => (state.cal && state.cal.url === state.settings.icsUrl ? state.cal.events : []).filter((e) => e.day === day);
+const calRow = (e) => `<li class="item cal-ev"><span class="cal-time">${e.time ? esc(e.time) + (e.end ? `<small>${esc(e.end)}</small>` : "") : "Όλη μέρα"}</span><div class="grow"><div class="title">${esc(e.title)}</div>${e.where ? `<div class="sub">${esc(e.where)}</div>` : ""}</div></li>`;
+
+/* ---------- market watch (openings and closures, from the web) ---------- */
+const CHANGE = { opened: ["Άνοιξε", "good"], opening: ["Ανοίγει", "warn"], closed: ["Έκλεισε", "bad"] };
+const normName = (t) => String(t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9α-ω]+/g, "");
+const matchShop = (name) => { const n = normName(name); return n.length < 3 ? null : state.shops.find((s) => { const m = normName(s.name); return m && (m === n || (m.length > 4 && n.includes(m)) || (n.length > 4 && m.includes(n))); }) || null; };
+async function scanArea(area) {
+  state.watchBusy = area; state.watchErr = ""; render();
+  const prompt = `Search the web for HoReCa venues (bars, cocktail bars, restaurants, tavernas, cafés, hotels, beach bars, clubs) in the ${area} area of Athens, Greece that opened, are about to open, or closed in roughly the last 90 days. Today is ${todayISO()}. Search in Greek and in English (for example "νέο μπαρ ${area}", "άνοιξε εστιατόριο ${area}", "έκλεισε ${area}", "new bar ${area} Athens"). Include only venues you found real evidence for, with the page that says so.
+Reply with only one JSON object:
+{"items":[{"name":"","type":"${TYPES.join("|")}","area":"${area}","address":"","change":"opened|opening|closed","date":"YYYY-MM-DD or YYYY-MM or empty","note":"one sentence in Greek","url":"source page"}]}
+Use an empty list if you found nothing reliable.`;
+  try {
+    const r = await state.sample.json(prompt, { webSearch: true, cache: false });
+    const items = (r && r.items || []).filter((x) => x && x.name && CHANGE[x.change]).slice(0, 30);
+    await guarded(() => state.db.doc("meta/watch").set({ ...(state.watch || {}), [area]: { at: new Date().toISOString(), items } }));
+  } catch (e) { state.watchErr = e && e.code === "invalid_json" ? "Δεν βρήκα καθαρά αποτελέσματα. Δοκίμασε ξανά αργότερα." : sampleErr(e); }
+  state.watchBusy = null; render();
+}
+function viewWatch() {
+  const areas = [...new Set(state.shops.map((s) => s.area).filter(Boolean))].sort();
+  const sel = state.watchArea || areas[0] || "Κέντρο Αθήνας";
+  const data = (state.watch || {})[sel];
+  const item = (x, i) => { const sh = matchShop(x.name), [lbl, cls] = CHANGE[x.change];
+    const act = sh ? (x.change === "closed" && !["closed", "lost"].includes(sh.status) && canEdit() ? `<button class="btn small" data-action="watch-close" data-id="${esc(sh.id)}">Σήμανση ως «Έκλεισε»</button>` : `<button class="btn small" data-action="open" data-id="${esc(sh.id)}">Άνοιγμα</button>`) : x.change !== "closed" && canEdit() ? `<button class="btn small primary" data-action="watch-add" data-area="${esc(sel)}" data-i="${i}">Πρόσθεσε ως υποψήφιο</button>` : "";
+    return `<li class="item watch-item"><div class="grow"><div class="title"><span class="pill ${cls}">${lbl}</span> ${esc(x.name)}</div><div class="sub">${esc([tr(x.type), x.address, x.date].filter(Boolean).join(" · "))}</div>${x.note ? `<div class="small">${esc(x.note)}</div>` : ""}<div class="row-actions">${act}${x.url ? `<a class="link small" href="${esc(x.url)}" target="_blank" rel="noopener">Πηγή ›</a>` : ""}</div>${sh ? `<div class="sub">Το έχεις ήδη: ${esc(sh.name)} (${esc(STATUSES[sh.status] || "")})</div>` : ""}</div></li>`; };
+  return `${banner()}<p class="muted small">Ο Jarvis ψάχνει στο ίντερνετ για μαγαζιά που άνοιξαν, ανοίγουν ή έκλεισαν στην περιοχή σου τους τελευταίους 3 μήνες. Κάθε σάρωση κάνει έως 8 αναζητήσεις (περίπου 0,10 € μαζί με τη χρήση του Claude).</p>
+  <div class="scroller">${(areas.length ? areas : [sel]).map((a) => `<button class="chip" data-action="watch-area" data-v="${esc(a)}" aria-pressed="${a === sel}">${esc(a)}${(state.watch || {})[a] ? `<span class="n">${(state.watch[a].items || []).length}</span>` : ""}</button>`).join("")}</div>
+  <div class="row-actions"><button class="btn primary" data-action="watch-scan" data-v="${esc(sel)}" ${state.watchBusy || !canEdit() || !state.sample ? "disabled" : ""}>${state.watchBusy === sel ? "Ψάχνω… (έως 1–2 λεπτά)" : `Σάρωση: ${esc(sel)}`}</button>${data ? `<span class="muted small">Τελευταία σάρωση ${esc(fmtDate(data.at.slice(0, 10)))}</span>` : ""}</div>
+  ${state.watchErr ? `<div class="banner">${esc(state.watchErr)}</div>` : ""}
+  ${data ? `<div class="panel"><ul class="list">${data.items.length ? data.items.map(item).join("") : emptyLi("pin", "Δεν βρέθηκαν ανοίγματα ή κλεισίματα σε αυτή την περιοχή.")}</ul></div>` : ""}`;
+}
+
 /* ---------- views: prospects ---------- */
 function viewProspects() {
   const ranked = state.shops.filter((s) => s.status === "prospect").sort((a, b) => (scoreOf(b) ?? -1) - (scoreOf(a) ?? -1));
@@ -677,7 +888,12 @@ function viewCatalogue(c) {
 function viewSettings() {
   const vchip = (k, l) => `<button class="chip" data-action="voice-lang" data-v="${k}" aria-pressed="${state.voiceLang === k}">${l}</button>`;
   const profile = canEdit() ? `<section class="section"><h2>Προφίλ</h2><form class="panel inline-form" data-form="profile"><div class="grid2">${fld({ form: "profile", name: "myName", label: "Πώς να σε λέει ο Jarvis", value: state.settings.myName ?? "Σωκράτη" })}${fld({ form: "profile", name: "visitTarget", label: "Στόχος επισκέψεων τον μήνα", type: "number", value: state.settings.visitTarget || 40, attrs: 'min="1" inputmode="numeric"' })}</div><div class="row-actions"><button class="btn primary small" type="submit">Αποθήκευση</button></div></form></section>` : "";
-  return `${profile}<section class="section"><h2>Λογαριασμός</h2><div class="panel"><dl class="kv"><dt>Συνδεδεμένος ως</dt><dd>${esc(state.email || "")}</dd><dt>Συγχρονισμός</dt><dd>${esc(syncText())}</dd></dl></div></section>
+  const cal = canEdit() ? `<section class="section"><h2>Ημερολόγιο</h2><form class="panel inline-form" data-form="calendar">${fld({ form: "calendar", name: "icsUrl", label: "Ιδιωτική διεύθυνση iCal του Google Calendar", value: state.settings.icsUrl || "", ph: "https://calendar.google.com/calendar/ical/.../basic.ics" })}
+    <p class="muted small">Στο Google Calendar (από υπολογιστή): Ρυθμίσεις → το ημερολόγιό σου → «Ενσωμάτωση ημερολογίου» → «Μυστική διεύθυνση σε μορφή iCal». Αντέγραψέ την εδώ και τα ραντεβού σου θα φαίνονται στην Ατζέντα. Μένει ιδιωτική στον λογαριασμό σου.</p>
+    ${state.cal && state.cal.error ? `<p class="small" style="color:var(--bad)">${state.cal.error === "server_old" ? "Χρειάζεται η ενημερωμένη έκδοση του jarvis-ai στο Supabase." : "Δεν μπόρεσα να διαβάσω το ημερολόγιο. Έλεγξε τη διεύθυνση."}</p>` : state.cal && state.cal.url === state.settings.icsUrl ? `<p class="muted small">Συνδεδεμένο ✓ ${plural(state.cal.events.length, "ραντεβού", "ραντεβού")} τις επόμενες εβδομάδες.</p>` : ""}
+    <div class="row-actions"><button class="btn primary small" type="submit">Αποθήκευση</button>${state.settings.icsUrl ? `<button class="btn small" type="button" data-action="cal-refresh">Ανανέωση</button>` : ""}</div></form>
+    <div class="row-actions"><button class="btn" data-action="cal-export">Λήψη επισκέψεων & εργασιών (.ics)</button></div><p class="muted small">Το αρχείο .ics ανοίγει σε Google Calendar, Outlook ή iPhone και περνάει όλες τις προγραμματισμένες επισκέψεις και εργασίες.</p></section>` : "";
+  return `${profile}${cal}<section class="section"><h2>Λογαριασμός</h2><div class="panel"><dl class="kv"><dt>Συνδεδεμένος ως</dt><dd>${esc(state.email || "")}</dd><dt>Συγχρονισμός</dt><dd>${esc(syncText())}</dd></dl></div></section>
   <section class="section"><h2>Γλώσσα φωνής</h2><div class="chips">${vchip("el-GR", "Ελληνικά")}${vchip("en-US", "English")}</div><p class="muted small">Η γλώσσα που ακούει το μικρόφωνο του Talk. Ο Jarvis καταλαβαίνει και τις δύο.</p></section>
   <section class="section"><h2>Αντίγραφο ασφαλείας</h2><p class="muted small">Κατέβασε όλα τα δεδομένα (μαγαζιά, εργασίες, επισκέψεις, καταλόγους) σε ένα αρχείο. Οι φωτογραφίες μένουν στον ιδιωτικό σου χώρο.</p><div class="row-actions"><button class="btn" data-action="backup">Λήψη αντιγράφου</button></div></section>
   <div class="row-actions"><button class="btn danger" data-action="sign-out">Αποσύνδεση</button></div>`;
@@ -713,7 +929,7 @@ function photoThumb(s, pid) { return pid ? `<button class="thumb" data-action="l
 
 function tabOverview(s) {
   const sc = scoreOf(s);
-  const kv = [["Ιδιοκτήτης", esc(s.owner)], ["Περιοχή", esc([s.area, s.city].filter(Boolean).join(", "))], ["Διεύθυνση", esc(s.address)], ["GPS", hasGeo(s) ? `<span class="num">${s.lat.toFixed(5)}, ${s.lng.toFixed(5)}</span>` : ""], ["Επόμενη επίσκεψη", fmtDate(s.nextVisit)], ["Τελευταία επίσκεψη", s.lastVisit ? `${fmtDate(s.lastVisit)} (πριν ${daysSinceVisit(s)} μέρες)` : ""], ["Η επένδυσή μας", s.investAmount ? `<span class="num">${esc(money(s.investAmount))}</span>` : ""], ["Λεπτομέρειες επένδυσης", esc(s.investNotes)]]
+  const kv = [["Ιδιοκτήτης", esc(s.owner)], ["Περιοχή", esc([s.area, s.city].filter(Boolean).join(", "))], ["Διεύθυνση", esc(s.address)], ["GPS", hasGeo(s) ? `<span class="num">${s.lat.toFixed(5)}, ${s.lng.toFixed(5)}</span>` : ""], ["Επόμενη επίσκεψη", s.nextVisit ? `${fmtDate(s.nextVisit)} <a class="link small" href="${gcalLink("Επίσκεψη: " + s.name, s.nextVisit, [tr(s.type), s.owner].filter(Boolean).join(" · "), [s.address, s.area, s.city].filter(Boolean).join(", "))}" target="_blank" rel="noopener">+ Google Calendar</a>` : ""], ["Τελευταία επίσκεψη", s.lastVisit ? `${fmtDate(s.lastVisit)} (πριν ${daysSinceVisit(s)} μέρες)` : ""], ["Η επένδυσή μας", s.investAmount ? `<span class="num">${esc(money(s.investAmount))}</span>` : ""], ["Λεπτομέρειες επένδυσης", esc(s.investNotes)]]
     .filter(([, v]) => v).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
   const n = (a) => (s[a] || []).length;
   return `<div class="stats"><div class="stat"><b>${n("assets")}</b><span>Εξοπλισμός</span></div><div class="stat"><b>${n("posm")}</b><span>POSM</span></div><div class="stat"><b>${n("backbar")}</b><span>Ετικέτες back bar</span></div><div class="stat"><b>${n("contacts")}</b><span>Επαφές</span></div></div>
@@ -922,7 +1138,7 @@ function render() {
     html = c ? viewCatalogue(c) : `<button class="back" data-action="back">← Πίσω</button><p class="muted">Αυτός ο κατάλογος διαγράφηκε.</p>`;
   } else {
     if (state.view === "market" || state.view === "catalogues") state.marketSeg = state.view === "market" ? "share" : "catalogues";
-    html = { today: viewToday, shops: viewShops, agenda: viewAgenda, more: viewMore, map: viewMap, prospects: viewProspects, market: viewMarket, catalogues: viewMarket, tasks: viewTasks, settings: viewSettings, route: viewRoute, report: viewReport, alerts: viewAlerts }[state.view]();
+    html = { today: viewToday, shops: viewShops, agenda: viewAgenda, more: viewMore, map: viewMap, prospects: viewProspects, market: viewMarket, catalogues: viewMarket, tasks: viewTasks, settings: viewSettings, route: viewRoute, report: viewReport, alerts: viewAlerts, files: viewFiles, watch: viewWatch }[state.view]();
   }
   const openAdders = [...app.querySelectorAll("details.adder[open] form")].map((f) => f.dataset.form);
   app.innerHTML = html + datalists();
@@ -1037,6 +1253,14 @@ async function onAction(ev) {
   else if (a === "route-plan") { const t = todayISO(); await guarded(async () => { for (const id of state.route.ids) { const s = shopById(id); if (s && s.nextVisit !== t) await state.db.doc("shops/" + id).update({ nextVisit: t }); } }); el.textContent = "Μπήκαν στο πρόγραμμα ✓"; }
   else if (a === "report-week") { state.reportWeek = Number(el.dataset.v); state.reportErr = ""; render(); }
   else if (a === "report-ai") reportAi();
+  else if (a === "file-save") fileSave();
+  else if (a === "file-cancel") { state.fileJob = null; render(); }
+  else if (a === "watch-area") { state.watchArea = el.dataset.v; state.watchErr = ""; render(); }
+  else if (a === "watch-scan") scanArea(el.dataset.v);
+  else if (a === "watch-add") { const x = state.watch[el.dataset.area].items[Number(el.dataset.i)]; await guarded(() => applyUpdate({ newShop: { name: x.name, type: TYPES.includes(x.type) ? x.type : "Other", area: x.area || el.dataset.area, city: "Athens", address: x.address || "", status: "prospect" }, fields: { insideInfoAdd: `${CHANGE[x.change][0]}${x.date ? " " + x.date : ""}. ${x.note || ""} ${x.url || ""}`.trim() }, source: "watch" }, new Date().toISOString())); el.textContent = "Προστέθηκε ✓"; el.disabled = true; }
+  else if (a === "watch-close") { const s = shopById(el.dataset.id); await guarded(() => state.db.doc("shops/" + s.id).update({ status: "closed", statusHistory: [...(s.statusHistory || []), statusEntry(s.status, "closed", "Βρέθηκε στην παρακολούθηση αγοράς")] })); render(); }
+  else if (a === "cal-export") exportIcs();
+  else if (a === "cal-refresh") { el.textContent = "Ανανέωση…"; loadCalendar(true); }
   else if (a === "report-copy") { const tx = document.getElementById("report-text").value; navigator.clipboard.writeText(tx).then(() => { el.textContent = "Αντιγράφηκε ✓"; }).catch(() => { document.getElementById("report-text").select(); }); }
   else if (a === "report-share") { const tx = document.getElementById("report-text").value; if (navigator.share) navigator.share({ title: "Εβδομαδιαία αναφορά", text: tx }).catch(() => {}); else navigator.clipboard.writeText(tx).then(() => { el.textContent = "Αντιγράφηκε ✓"; }).catch(() => {}); }
   else if (a === "notif-on") { Notification.requestPermission().then(() => { try { localStorage.removeItem("jarvis-notified"); } catch {} render(); }); }
@@ -1092,6 +1316,7 @@ document.querySelector("header.top").addEventListener("click", onAction);
 
 app.addEventListener("change", async (ev) => {
   const el = ev.target;
+  if (el.dataset.action === "file-pick") { const f = el.files && el.files[0]; if (f) readFile(f, (document.getElementById("file-note") || {}).value || ""); return; }
   if (el.dataset.action === "agenda-pick") { if (el.value) { state.agendaDay = el.value; render(); } return; }
   if (el.dataset.action === "toggle-task") {
     const done = el.checked;
@@ -1177,6 +1402,9 @@ app.addEventListener("submit", async (ev) => {
     await pushTo("catalogues", state.catId, "items", { brand: v("brand"), product: v("product"), category: v("category"), size: v("size"), price: v("price") });
   } else if (kind === "profile") {
     await guarded(() => state.db.doc("meta/settings").set({ ...state.settings, myName: v("myName"), visitTarget: Number(v("visitTarget")) || 40 }));
+  } else if (kind === "calendar") {
+    await guarded(() => state.db.doc("meta/settings").set({ ...state.settings, icsUrl: v("icsUrl") }));
+    state.settings.icsUrl = v("icsUrl"); loadCalendar(true);
   } else if (kind === "settings") {
     await guarded(() => state.db.doc("meta/settings").set({ ...state.settings, myCompany: v("myCompany") }));
   }
@@ -1274,7 +1502,7 @@ function renderTalk() {
   talkRoot.innerHTML = `<div class="sheet-bg"><div class="sheet" role="dialog" aria-label="Μίλα στον Jarvis"><div class="section-head"><h2>Μίλα στον Jarvis</h2>${state.shopId && shopById(state.shopId) ? `<span class="muted small">${esc(shopById(state.shopId).name)}</span>` : ""}</div>${body}</div></div>`;
   const ta = document.getElementById("talk-text"); if (ta && !t.result && !t.listening && !Rec) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
 }
-const sampleErr = (e) => ({ not_granted: "Ο Jarvis χρειάζεται άδεια για να χρησιμοποιήσει το Claude. Πάτα ξανά Αποστολή και επίλεξε Allow.", rate_limited: "Πολλά αιτήματα μαζί. Περίμενε ένα λεπτό και δοκίμασε ξανά.", invalid_json: "Δεν το κατάλαβα. Δοκίμασε να το πεις πιο απλά.", prompt_too_large: "Τα δεδομένα σου έγιναν πολύ μεγάλα για μία αποστολή. Πες το στο Claude στη συνομιλία.", session_expired: "Αποσυνδέθηκες. Άνοιξε ξανά την εφαρμογή.", offline: "Είσαι εκτός σύνδεσης. Τα λόγια σου μένουν εδώ, στείλ' τα όταν έχεις σήμα.", ai_error: "Ο Jarvis δεν μπόρεσε να συνδεθεί με το Claude. Έλεγξε τη σύνδεση και δοκίμασε ξανά.", refused: "Το Claude αρνήθηκε αυτό το αίτημα. Δοκίμασε να το διατυπώσεις αλλιώς." }[e && e.code] || "Κάτι πήγε στραβά. Δοκίμασε ξανά.");
+const sampleErr = (e) => ({ not_granted: "Ο Jarvis χρειάζεται άδεια για να χρησιμοποιήσει το Claude. Πάτα ξανά Αποστολή και επίλεξε Allow.", rate_limited: "Πολλά αιτήματα μαζί. Περίμενε ένα λεπτό και δοκίμασε ξανά.", invalid_json: "Δεν το κατάλαβα. Δοκίμασε να το πεις πιο απλά.", prompt_too_large: "Τα δεδομένα σου έγιναν πολύ μεγάλα για μία αποστολή. Πες το στο Claude στη συνομιλία.", session_expired: "Αποσυνδέθηκες. Άνοιξε ξανά την εφαρμογή.", offline: "Είσαι εκτός σύνδεσης. Τα λόγια σου μένουν εδώ, στείλ' τα όταν έχεις σήμα.", ai_error: "Ο Jarvis δεν μπόρεσε να συνδεθεί με το Claude. Έλεγξε τη σύνδεση και δοκίμασε ξανά.", refused: "Το Claude αρνήθηκε αυτό το αίτημα. Δοκίμασε να το διατυπώσεις αλλιώς.", server_old: "Αυτό χρειάζεται την ενημερωμένη έκδοση του jarvis-ai στο Supabase. Ακολούθησε τα βήματα που σου έστειλα και δοκίμασε ξανά." }[e && e.code] || "Κάτι πήγε στραβά. Δοκίμασε ξανά.");
 async function talkSend() {
   const t = state.talk; const ta = document.getElementById("talk-text");
   t.text = ta ? ta.value.trim() : t.text; t.error = "";
@@ -1285,28 +1513,32 @@ async function talkSend() {
   catch (e) { if (e && e.code !== "cancelled") t.error = sampleErr(e); t.result = null; }
   t.busy = false; renderTalk();
 }
+/* Saves one update (from Talk or from a work file): shop fields, items, visit, tasks. Returns the shop id. */
+async function applyUpdate(r, stamp) {
+  let id = r.shopId;
+  if (!id && r.newShop) { const ref = state.db.collection("shops").doc(); id = ref.id; await ref.set({ name: r.newShop.name || "Νέο μαγαζί", type: r.newShop.type || "Other", status: r.newShop.status || "prospect", area: r.newShop.area || "", city: r.newShop.city || "Athens", address: r.newShop.address || "", ...(!r.source && state.here && Date.now() - state.here.at < 10 * 60000 ? { lat: state.here.lat, lng: state.here.lng } : {}), createdAt: stamp, updatedAt: stamp, statusHistory: [statusEntry("", r.newShop.status || "prospect")], photos: [], contacts: [], assets: [], posm: [], backbar: [], products: [], consumption: [], scores: {} }); }
+  const s = shopById(id) || {};
+  const f = r.fields || {}; const patch = { updatedAt: stamp };
+  ["owner", "address", "area", "status", "nextVisit"].forEach((k) => { if (f[k]) patch[k] = f[k]; });
+  if (!r.newShop && f.status && f.status !== s.status) patch.statusHistory = [...(s.statusHistory || []), statusEntry(s.status, f.status, f.statusReason || "")];
+  if (f.investAmount) patch.investAmount = Number(f.investAmount);
+  if (f.insideInfoAdd) patch.insideInfo = [s.insideInfo, `${todayISO()}: ${f.insideInfoAdd}`].filter(Boolean).join("\n");
+  if (f.pricingNotesAdd) patch.pricingNotes = [s.pricingNotes, `${todayISO()}: ${f.pricingNotesAdd}`].filter(Boolean).join("\n");
+  if (f.scores && Object.keys(f.scores).length) patch.scores = { ...(s.scores || {}), ...f.scores };
+  const known = brandIndex();
+  const add = (field, items, map = (x) => x) => { if (items && items.length) patch[field] = [...(s[field] || []), ...items.map(map)]; };
+  add("contacts", r.contacts); add("assets", r.assets); add("posm", r.posm); add("products", r.products); add("consumption", r.consumption, (c) => ({ ...c, qty: Number(c.qty) || 0 }));
+  add("backbar", r.backbar, (b) => ({ brand: b.brand, company: b.company || (known[(b.brand || "").toLowerCase()] || {}).company || "", category: b.category || (known[(b.brand || "").toLowerCase()] || {}).category || "", facings: Number(b.facings) || 1 }));
+  if (r.backbar && r.backbar.length) patch.backbarDate = todayISO();
+  if (r.visit && r.visit.notes) { const date = r.visit.date || todayISO(); await state.db.collection("visits").doc().set({ shopId: id, date, notes: r.visit.notes, createdAt: stamp, source: r.source || "voice" }); if (!s.lastVisit || date > s.lastVisit) patch.lastVisit = date; }
+  await state.db.doc("shops/" + id).update(patch);
+  for (const tk of r.tasks || []) await state.db.collection("tasks").doc().set({ title: tk.title, due: tk.due || "", shopId: id, done: false, createdAt: stamp });
+  return id;
+}
 async function talkSave() {
-  const r = state.talk.result; const stamp = new Date().toISOString(); let id = r.shopId;
+  const r = state.talk.result; const stamp = new Date().toISOString(); let id = null;
   state.busy = true;
-  const ok = await guarded(async () => {
-    if (!id && r.newShop) { const ref = state.db.collection("shops").doc(); id = ref.id; await ref.set({ name: r.newShop.name || "Νέο μαγαζί", type: r.newShop.type || "Other", status: r.newShop.status || "prospect", area: r.newShop.area || "", city: r.newShop.city || "Athens", address: r.newShop.address || "", ...(state.here && Date.now() - state.here.at < 10 * 60000 ? { lat: state.here.lat, lng: state.here.lng } : {}), createdAt: stamp, updatedAt: stamp, statusHistory: [statusEntry("", r.newShop.status || "prospect")], photos: [], contacts: [], assets: [], posm: [], backbar: [], products: [], consumption: [], scores: {} }); }
-    const s = shopById(id) || {};
-    const f = r.fields || {}; const patch = { updatedAt: stamp };
-    ["owner", "address", "area", "status", "nextVisit"].forEach((k) => { if (f[k]) patch[k] = f[k]; });
-    if (!r.newShop && f.status && f.status !== s.status) patch.statusHistory = [...(s.statusHistory || []), statusEntry(s.status, f.status, f.statusReason || "")];
-    if (f.investAmount) patch.investAmount = Number(f.investAmount);
-    if (f.insideInfoAdd) patch.insideInfo = [s.insideInfo, `${todayISO()}: ${f.insideInfoAdd}`].filter(Boolean).join("\n");
-    if (f.pricingNotesAdd) patch.pricingNotes = [s.pricingNotes, `${todayISO()}: ${f.pricingNotesAdd}`].filter(Boolean).join("\n");
-    if (f.scores && Object.keys(f.scores).length) patch.scores = { ...(s.scores || {}), ...f.scores };
-    const known = brandIndex();
-    const add = (field, items, map = (x) => x) => { if (items && items.length) patch[field] = [...(s[field] || []), ...items.map(map)]; };
-    add("contacts", r.contacts); add("assets", r.assets); add("posm", r.posm); add("products", r.products); add("consumption", r.consumption, (c) => ({ ...c, qty: Number(c.qty) || 0 }));
-    add("backbar", r.backbar, (b) => ({ brand: b.brand, company: b.company || (known[(b.brand || "").toLowerCase()] || {}).company || "", category: b.category || (known[(b.brand || "").toLowerCase()] || {}).category || "", facings: Number(b.facings) || 1 }));
-    if (r.backbar && r.backbar.length) patch.backbarDate = todayISO();
-    if (r.visit && r.visit.notes) { const date = r.visit.date || todayISO(); await state.db.collection("visits").doc().set({ shopId: id, date, notes: r.visit.notes, createdAt: stamp, source: "voice" }); if (!s.lastVisit || date > s.lastVisit) patch.lastVisit = date; }
-    await state.db.doc("shops/" + id).update(patch);
-    for (const tk of r.tasks || []) await state.db.collection("tasks").doc().set({ title: tk.title, due: tk.due || "", shopId: id, done: false, createdAt: stamp });
-  });
+  const ok = await guarded(async () => { id = await applyUpdate(r, stamp); });
   state.busy = false;
   if (ok) { state.talk = null; renderTalk(); openShop(id, { tab: r.visit ? "visits" : "overview" }); }
   else renderTalk();
@@ -1398,6 +1630,7 @@ async function startApp(session) {
   state.assets = makeAssets(uid);
   state.sample = makeSample();
   state.imgLimits = (await state.sample.limits()).images;
+  try { state.cal = JSON.parse(localStorage.getItem("jarvis-cal") || "null"); } catch {}
   routeFromHash();
   showWelcome();
   const db = state.db;
@@ -1405,7 +1638,8 @@ async function startApp(session) {
   db.collection("tasks").onSnapshot((snap) => { state.tasks = snap.docs.map(clean); state.loaded.tasks = true; safeRender(); });
   db.collection("visits").orderBy("date", "desc").limit(500).onSnapshot((snap) => { state.visits = snap.docs.map(clean); safeRender(); });
   db.collection("catalogues").onSnapshot((snap) => { state.catalogues = snap.docs.map(clean); safeRender(); });
-  db.doc("meta/settings").onSnapshot((d) => { state.settings = d.exists ? d.data() : {}; safeRender(); });
+  db.doc("meta/settings").onSnapshot((d) => { state.settings = d.exists ? d.data() : {}; safeRender(); loadCalendar(); });
+  db.doc("meta/watch").onSnapshot((d) => { state.watch = d.exists ? d.data() : {}; safeRender(); });
   await store.start();
   if (!navigator.onLine && !store.hasCache()) { state.noDb = true; render(); }
 }

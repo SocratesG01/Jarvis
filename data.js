@@ -166,13 +166,27 @@ export function makeSample() {
     if (!navigator.onLine) throw { code: "offline" };
     const images = opts.images ? await Promise.all([...opts.images].map(async (b) => ({ media_type: b.type && b.type.startsWith("image/") ? b.type : "image/jpeg", data: await toB64(b) }))) : [];
     const aborted = new Promise((_, rej) => opts.signal && opts.signal.addEventListener("abort", () => rej({ code: "cancelled" })));
-    const { data, error } = await Promise.race([sb.functions.invoke("jarvis-ai", { body: { prompt, images } }), aborted]);
+    const documents = opts.documents ? await Promise.all([...opts.documents].map(async (b) => ({ media_type: "application/pdf", data: await toB64(b) }))) : [];
+    const body = { prompt, images, ...(documents.length ? { documents } : {}), ...(opts.webSearch ? { web_search: true } : {}) };
+    const { data, error } = await Promise.race([sb.functions.invoke("jarvis-ai", { body }), aborted]);
     if (error) throw { code: "ai_error", message: error.message };
     if (data && data.error) throw { code: data.error === "refusal" ? "refused" : "ai_error", message: data.error };
+    // Older servers ignore PDFs and web search; version 2 handles them.
+    if ((documents.length || opts.webSearch) && data.version !== 2) throw { code: "server_old" };
     return { text: data.text || "" };
+  }
+  /* Your private calendar feed, fetched by the server (browsers can't read it directly). */
+  async function ics(url) {
+    if (!navigator.onLine) throw { code: "offline" };
+    const { data, error } = await sb.functions.invoke("jarvis-ai", { body: { ics_url: url } });
+    if (error) throw { code: "ai_error", message: error.message };
+    if (!data || data.version !== 2) throw { code: "server_old" };
+    if (data.error) throw { code: "ics_error", message: data.error };
+    return data.ics || "";
   }
   const sample = (prompt, opts) => call(prompt, opts);
   sample.json = async (prompt, opts) => parseJson((await call(prompt, opts)).text);
+  sample.ics = ics;
   sample.limits = async () => ({ maxPromptBytes: 900000, images: { maxCount: 6, maxInputBytes: 20 * 1024 * 1024, mediaTypes: ["image/jpeg", "image/png", "image/webp"] } });
   return sample;
 }
