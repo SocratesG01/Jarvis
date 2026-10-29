@@ -52,6 +52,46 @@ const mapsDir = (s) => "https://www.google.com/maps/dir/?api=1&destination=" + e
 const canEdit = () => state.canWrite && !state.noDb;
 const canUpload = () => canEdit() && !!state.assets;
 const cover = (s) => { const p = (s.photos || []).find((x) => x.kind === "exterior") || (s.photos || [])[0]; return p ? p.id : null; };
+const arrow = (up) => `<svg class="arr ${up ? "up" : "down"}" viewBox="0 0 10 10" aria-label="${up ? "πάνω" : "κάτω"}"><path d="${up ? "M5 1.5l4 7H1z" : "M5 8.5l4-7H1z"}"/></svg>`;
+const norm = (x) => String(x ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const clip = (t, n) => { t = String(t || "").replace(/\s+/g, " ").trim(); return t.length > n ? t.slice(0, n - 1) + "…" : t; };
+const isDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d || "");
+const mainContact = (s) => (s.contacts || []).find((c) => c.phone) || (s.contacts || [])[0] || null;
+const telHref = (p) => "tel:" + String(p).replace(/[^\d+]/g, "");
+const lastOrder = (s) => (s.orders || []).slice().sort((a, b) => (b.date || "").localeCompare(a.date || ""))[0] || null;
+const orderText = (o) => (o.items || []).map((i) => [i.product, i.qty, i.unit].filter((x) => x !== "" && x != null).join(" ")).join(", ") || o.notes || "";
+const visitsOf = (id) => state.visits.filter((v) => v.shopId === id).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+const visitedOn = (day) => new Set(state.visits.filter((v) => v.date === day).map((v) => v.shopId));
+/* The next thing to do for a shop: its earliest open task or its planned visit. */
+function nextActionOf(s) {
+  const t = todayISO(), c = [];
+  const task = state.tasks.filter((x) => !x.done && x.shopId === s.id).sort((a, b) => (a.due || "9999").localeCompare(b.due || "9999"))[0];
+  if (task) c.push({ date: task.due || "", text: task.title, late: !!task.due && task.due < t });
+  if (s.nextVisit && s.nextVisit >= t) c.push({ date: s.nextVisit, text: "Επίσκεψη" });
+  return c.sort((a, b) => (a.date || "9999").localeCompare(b.date || "9999"))[0] || null;
+}
+const actionText = (n) => n ? `${n.late ? "Εκπρόθεσμο: " : ""}${n.text}${n.date ? " · " + fmtDate(n.date) : ""}` : "";
+/* Who needs attention first, with the reasons, from real data only. Shops already planned for today are left out. */
+function priorities() {
+  const t = todayISO(), out = [];
+  state.shops.forEach((s) => {
+    if (s.status === "closed" || s.status === "lost" || s.nextVisit === t) return;
+    let score = 0; const why = [];
+    const late = state.tasks.filter((x) => !x.done && x.shopId === s.id && x.due && x.due < t).length;
+    if (late) { score += 50 + 5 * late; why.push(plural(late, "εκπρόθεσμη εργασία", "εκπρόθεσμες εργασίες")); }
+    if (s.nextVisit && s.nextVisit < t && (!s.lastVisit || s.lastVisit < s.nextVisit)) { score += 40; why.push(`χάθηκε η επίσκεψη ${fmtDate(s.nextVisit)}`); }
+    if (s.status === "active") {
+      const d = daysSinceVisit(s);
+      if (d == null) { score += 25; why.push("καμία επίσκεψη ακόμα"); } else if (d >= QUIET_DAYS) { score += 20 + Math.min(30, d - QUIET_DAYS); why.push(`${d} μέρες χωρίς επίσκεψη`); }
+      const lo = lastOrder(s), od = lo ? daysBetween(lo.date, t) : null;
+      if (od != null && od >= 30) { score += 15; why.push(`παραγγελία πριν ${od} μέρες`); }
+      if (score && Number(s.investAmount) > 0) score += Math.min(15, Number(s.investAmount) / 1000);
+    }
+    if (s.status === "prospect") { const sc = scoreOf(s) ?? 0; if (sc >= 60 && (!s.lastVisit || daysSinceVisit(s) >= 14)) { score += sc / 3; why.push(`υποψήφιος ${sc}/100`); } }
+    if (score > 0) out.push({ s, score, why });
+  });
+  return out.sort((a, b) => b.score - a.score);
+}
 
 const distKm = (a, b) => { const R = 6371, r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLng = (b.lng - a.lng) * r; const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLng / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(h)); };
 const fmtDist = (km) => km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
@@ -85,9 +125,9 @@ function datalists() {
 
 /* ---------- navigation ---------- */
 const TABS = ["today", "shops", "agenda", "more"];
-const PARENT = { map: "more", prospects: "more", market: "more", catalogues: "more", tasks: "agenda", settings: "more", route: "agenda", report: "more", alerts: "today", files: "more", watch: "more" };
+const PARENT = { map: "more", prospects: "more", market: "more", catalogues: "more", tasks: "agenda", settings: "more", route: "agenda", report: "more", alerts: "today", files: "more", watch: "more", sales: "more" };
 const PAGES = [...TABS, ...Object.keys(PARENT)];
-const TITLES = { today: "Jarvis", shops: "Μαγαζιά", agenda: "Ατζέντα", more: "Άλλα", map: "Χάρτης", prospects: "Υποψήφιοι", market: "Μερίδιο αγοράς", catalogues: "Κατάλογοι", tasks: "Όλες οι εργασίες", settings: "Ρυθμίσεις", route: "Διαδρομή ημέρας", report: "Εβδομαδιαία αναφορά", alerts: "Ειδοποιήσεις", files: "Αρχεία δουλειάς", watch: "Παρακολούθηση αγοράς" };
+const TITLES = { today: "Jarvis", shops: "Μαγαζιά", agenda: "Ατζέντα", more: "Άλλα", map: "Χάρτης", prospects: "Υποψήφιοι", market: "Μερίδιο αγοράς", catalogues: "Κατάλογοι", tasks: "Όλες οι εργασίες", settings: "Ρυθμίσεις", route: "Διαδρομή ημέρας", report: "Εβδομαδιαία αναφορά", alerts: "Ειδοποιήσεις", files: "Αρχεία δουλειάς", watch: "Παρακολούθηση αγοράς", sales: "Πωλήσεις & στόχοι" };
 function nav(view) { if (location.hash.slice(1) === view) go(view); else location.hash = view; }
 function go(view) { Object.assign(state, { reading: null, view, shopId: null, catId: null, editing: false, armed: null, dirty: false }); render(); window.scrollTo(0, 0); }
 function openShop(id, opts = {}) { Object.assign(state, { reading: null, shopId: id, catId: null, editing: !!opts.edit, armed: null, dirty: false, shopTab: opts.tab || "overview", consProduct: null }); render(); window.scrollTo(0, 0); }
@@ -117,6 +157,9 @@ const ICON = {
   route: ic('<circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="6" r="2.2"/><path d="M8 18h7a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h7"/>'),
   report: ic('<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 12h7M9 16h7"/>'),
   chev: ic('<path d="M9 5l7 7-7 7"/>'),
+  done: ic('<circle cx="12" cy="12" r="8.5"/><path d="M8.2 12.4l2.6 2.6 5-5.2"/>'),
+  play: ic('<circle cx="12" cy="12" r="9"/><path d="M10 8.5l5.5 3.5-5.5 3.5z"/>'),
+  trend: ic('<path d="M3 17l6-6 4 4 8-8M15 7h6v6"/>'),
 };
 const TYPE_ICON = {
   "Restaurant": ic('<path d="M7 3v7M5 3v4a2 2 0 0 0 4 0V3M7 10v11M17 21V3c-2 1-3.5 4-3.5 8H17"/>'),
@@ -176,17 +219,22 @@ function banner() {
   return "";
 }
 
-function shopRow(s, extra = "", rank = null) {
+function quickActs(s) {
+  const c = mainContact(s);
+  return `<span class="qacts">${c && c.phone ? `<a class="icon-btn small" href="${esc(telHref(c.phone))}" aria-label="Κλήση ${esc(c.name || s.name)}" title="Κλήση">${ICON.phone}</a>` : ""}<a class="icon-btn small" href="${mapsDir(s)}" target="_blank" rel="noopener" aria-label="Οδηγίες για ${esc(s.name)}" title="Οδηγίες">${ICON.nav}</a>${canEdit() ? `<button class="icon-btn small" data-action="log-visit" data-id="${esc(s.id)}" aria-label="Καταγραφή επίσκεψης στο ${esc(s.name)}" title="Καταγραφή επίσκεψης">${ICON.done}</button>` : ""}</span>`;
+}
+function shopRow(s, extra = "", rank = null, quick = false) {
   const sc = scoreOf(s);
   const c = cover(s);
   const left = rank != null ? `<div class="score ${sc == null || sc < 50 ? "low" : ""}">${sc == null ? "–" : sc}</div>`
     : c ? `<span class="thumb"><img ${img(c)} alt="" loading="lazy"></span>` : shopAvatar(s);
-  const last = s.lastVisit ? `Επίσκεψη ${fmtDate(s.lastVisit)}` : "Χωρίς επίσκεψη ακόμα";
-  return `<li><button class="item" data-action="open" data-id="${esc(s.id)}">${left}
-    <div class="grow"><div class="title">${rank != null ? `<span class="muted num">#${rank}</span> ` : ""}${esc(s.name || "Μαγαζί χωρίς όνομα")}</div>
+  let last = s.lastVisit ? `Επίσκεψη ${fmtDate(s.lastVisit)}` : "Χωρίς επίσκεψη ακόμα";
+  if (quick) { const na = nextActionOf(s); if (na) last += " · Επόμενο: " + actionText(na); }
+  return `<li${quick ? ` class="qrow"` : ""}><button class="item" data-action="open" data-id="${esc(s.id)}">${left}
+    <div class="grow"><div class="title">${rank != null ? `<span class="muted num">#${rank}</span> ` : ""}${esc(s.name || "Μαγαζί χωρίς όνομα")}${quick ? (s.example ? ` <span class="pill example">Παράδειγμα</span>` : ` <span class="pill ${esc(s.status)}">${esc(STATUSES[s.status] || "")}</span>`) : ""}</div>
     <div class="sub">${esc([tr(s.type), areaOf(s) === "Χωρίς περιοχή" ? "" : s.area].filter(Boolean).join(" · "))}${s.type || s.area ? " · " : ""}${extra || last}</div></div>
-    ${s.example ? `<span class="pill example">Παράδειγμα</span>` : `<span class="pill ${esc(s.status)}">${esc(STATUSES[s.status] || "")}</span>`}<span class="chev">${ICON.chev}</span>
-  </button></li>`;
+    ${quick ? "" : `${s.example ? `<span class="pill example">Παράδειγμα</span>` : `<span class="pill ${esc(s.status)}">${esc(STATUSES[s.status] || "")}</span>`}<span class="chev">${ICON.chev}</span>`}
+  </button>${quick ? quickActs(s) : ""}</li>`;
 }
 
 function taskRow(t) {
@@ -275,72 +323,68 @@ function territoryMap() {
   const labels = places.map(([n, x, y]) => `<text x="${(x + 6).toFixed(0)}" y="${(y + 4).toFixed(0)}">${esc(n)}</text><circle class="tm-place" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="1.8"/>`).join("");
   return `<svg class="tm" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><polygon class="tm-sea" points="${sea}"/><g class="tm-roads">${roads}</g>${labels}${dots}</svg>`;
 }
-function jarvisSuggestion() {
-  const t = todayISO();
-  const hot = state.shops.filter((s) => s.status === "prospect" && (scoreOf(s) ?? 0) >= 60 && (!s.lastVisit || daysSinceVisit(s) >= 14)).sort((a, b) => scoreOf(b) - scoreOf(a))[0];
-  if (hot) return { id: hot.id, text: `Το ${hot.name} είναι υποψήφιος υψηλής αξίας (${scoreOf(hot)}/100). Κλείσε μια επίσκεψη αυτή την εβδομάδα.` };
-  const quiet = state.shops.filter(isQuiet).sort((a, b) => (a.lastVisit || "").localeCompare(b.lastVisit || ""))[0];
-  if (quiet) return { id: quiet.id, text: quiet.lastVisit ? `Το ${quiet.name} δεν έχει επίσκεψη εδώ και ${daysSinceVisit(quiet)} μέρες. Μια γρήγορη στάση κρατάει τη σχέση ζεστή.` : `Το ${quiet.name} δεν έχει καμία επίσκεψη ακόμα. Πέρνα να γνωριστείτε.` };
-  const late = state.tasks.filter((x) => !x.done && x.due && x.due < t).sort((a, b) => a.due.localeCompare(b.due))[0];
-  if (late) return { id: late.shopId || "", text: `Έχεις εκπρόθεσμη εργασία: «${late.title}». Κλείσ' τη σήμερα.` };
-  return { id: "", text: "Όλα υπό έλεγχο. Πρόσθεσε νέους υποψήφιους στην περιοχή σου για να μεγαλώσεις το χαρτοφυλάκιο." };
-}
+const dayStarted = () => { try { return localStorage.getItem("jarvis-day") === todayISO(); } catch { return false; } };
 function viewToday() {
   const t = todayISO();
   loadWeather();
   loadCalendar();
   const name = state.settings.myName ?? "Σωκράτη";
   const open = state.tasks.filter((x) => !x.done);
-  const overdue = open.filter((x) => x.due && x.due < t);
+  const overdue = open.filter((x) => x.due && x.due < t).sort((a, b) => a.due.localeCompare(b.due));
+  const todayTasks = open.filter((x) => x.due === t);
+  const visited = visitedOn(t);
+  const planned = state.shops.filter((s) => s.nextVisit === t);
+  /* today's visits = planned for today plus any shop visited today (each shop once) */
+  const todayShops = [...planned, ...state.shops.filter((s) => visited.has(s.id) && s.nextVisit !== t)];
+  const doneN = todayShops.filter((s) => visited.has(s.id)).length;
+  const events = calOn(t);
+  const pri = priorities().slice(0, 5);
+  const started = dayStarted();
   const customers = state.shops.filter((s) => s.status === "active");
   const weekAgo = addDays(t, -7);
-  const newThisWeek = state.shops.filter((s) => (s.createdAt || "").slice(0, 10) >= weekAgo).length;
-  const planned = state.shops.filter((s) => s.nextVisit === t);
-  const doneToday = state.visits.filter((v) => v.date === t);
+  const newCustomers = state.shops.filter((s) => (s.statusHistory || []).some((h) => h.to === "active" && (h.at || "").slice(0, 10) >= weekAgo)).length;
   const month = t.slice(0, 7), target = Number(state.settings.visitTarget) || 40;
   const monthVisits = state.visits.filter((v) => (v.date || "").startsWith(month)).length;
   const pct = Math.min(100, Math.round(monthVisits / target * 100));
   const card = (action, v, icon, n, label, sub, extra = "") => `<button class="jx-stat" data-action="${action}" data-v="${v}"><span class="jx-ic">${icon}</span><b>${n}</b><span class="jx-label">${label}</span>${extra}<span class="jx-sub2">${sub}</span></button>`;
-  const todayTasks = open.filter((x) => x.due === t);
-  const rows = [
-    ...calOn(t).map((e) => ({ kind: "cal", e })), ...overdue.map((x) => ({ kind: "late", x })), ...planned.map((s) => ({ kind: "visit", s })), ...todayTasks.map((x) => ({ kind: "task", x })),
-  ].slice(0, 6);
-  const row = (r) => {
-    if (r.kind === "cal") return `<li><button class="jx-row" data-action="go" data-v="agenda"><i class="d cal"></i><span class="jx-when">${esc(r.e.time || "Όλη μέρα")}</span><span class="jx-what"><b>${esc(r.e.title)}</b><small>${esc(r.e.where || "Ημερολόγιο")}</small></span><span class="chev">${ICON.chev}</span></button></li>`;
-    if (r.kind === "visit") return `<li><button class="jx-row" data-action="open" data-id="${esc(r.s.id)}"><i class="d visit"></i><span class="jx-when">Επίσκεψη</span><span class="jx-what"><b>${esc(r.s.name)}</b><small>${esc([tr(r.s.type), r.s.area].filter(Boolean).join(" · "))}</small></span><span class="chev">${ICON.chev}</span></button></li>`;
-    const sh = r.x.shopId ? shopById(r.x.shopId) : null;
-    return `<li><button class="jx-row" ${sh ? `data-action="open" data-id="${esc(sh.id)}"` : `data-action="go" data-v="agenda"`}><i class="d ${r.kind}"></i><span class="jx-when">${r.kind === "late" ? "Εκπρόθ." : "Εργασία"}</span><span class="jx-what"><b>${esc(r.x.title)}</b><small>${esc(sh ? sh.name : "Χωρίς μαγαζί")}</small></span><span class="chev">${ICON.chev}</span></button></li>`;
-  };
-  const sug = jarvisSuggestion();
-  const quiet = state.shops.filter(isQuiet).sort((a, b) => (a.lastVisit || "").localeCompare(b.lastVisit || "")).slice(0, 4);
+  const brief = [plural(todayShops.length, "επίσκεψη", "επισκέψεις"), events.length ? plural(events.length, "ραντεβού", "ραντεβού") : "", todayTasks.length ? plural(todayTasks.length, "εργασία", "εργασίες") : "", overdue.length ? `<span class="warn">${overdue.length} εκπρόθεσμα</span>` : ""].filter(Boolean).join(" · ");
+  const visitRow = (s) => { const done = visited.has(s.id); return `<li class="jx-qrow"><button class="jx-row" data-action="open" data-id="${esc(s.id)}"><i class="d ${done ? "done" : "visit"}"></i><span class="jx-when">${done ? "Έγινε" : "Επίσκεψη"}</span><span class="jx-what"><b>${esc(s.name)}</b><small>${esc([tr(s.type), s.area, actionText(nextActionOf(s))].filter(Boolean).join(" · "))}</small></span></button>${done ? "" : quickActs(s)}</li>`; };
+  const evRow = (e) => `<li><button class="jx-row" data-action="go" data-v="agenda"><i class="d cal"></i><span class="jx-when">${esc(e.time || "Όλη μέρα")}</span><span class="jx-what"><b>${esc(e.title)}</b><small>${esc(e.where || "Ημερολόγιο")}</small></span><span class="chev">${ICON.chev}</span></button></li>`;
+  const plan = [...events.map(evRow), ...todayShops.sort((a, b) => visited.has(a.id) - visited.has(b.id)).map(visitRow), ...todayTasks.map(taskRow)];
+  const sales = salesSummary();
   return `${banner()}
   <section class="jx-hero">${NIGHT}
-    <div class="jx-greet"><h1>${greeting()}${name ? `,<br><span class="jx-name">${esc(name)}.</span>` : ""}</h1>
-      <p class="jx-lead">Το χαρτοφυλάκιό σου στην Αθήνα είναι έτοιμο.</p>
-      <p class="jx-tag">Περισσότερες επισκέψεις. Δυνατότερες σχέσεις. Καλύτερα αποτελέσματα.</p></div>
-    <div class="jx-meta">${weatherHtml()}<span class="jx-sep"></span><span class="jx-clock"><small>${esc(new Date().toLocaleDateString("el-GR", { weekday: "short", day: "numeric", month: "short" }))}</small><b id="jx-time">${clockText()}</b></span></div>
+    <div class="jx-top"><h1 class="jx-hi">${greeting()}${name ? `, <span class="jx-name">${esc(name)}</span>` : ""}</h1>${weatherHtml()}</div>
+    <p class="jx-brief"><b>${esc(new Date().toLocaleDateString("el-GR", { weekday: "long", day: "numeric", month: "long" }))}</b><br>${brief}</p>
+    ${canEdit() ? `<button class="jx-start" data-action="start-day">${started ? ICON.route : ICON.play}<span><b>${started ? "Συνέχισε τη μέρα" : "Ξεκίνα τη μέρα μου"}</b><small>${started ? `${doneN} από ${plural(todayShops.length, "επίσκεψη", "επισκέψεις")} έγιναν` : "Ο Jarvis φτιάχνει τη διαδρομή με τις προτεραιότητές σου"}</small></span><span class="chev">${ICON.chev}</span></button>` : ""}
   </section>
+  <section class="jx-card jx-sched">
+    <div class="jx-sched-head"><span class="jx-ic">${ic('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 14h2M12 14h2M8 17h2"/>')}</span><span class="grow"><b>Σήμερα</b><small>${todayShops.length ? `${doneN}/${todayShops.length} επισκέψεις` : "Καμία προγραμματισμένη επίσκεψη"}</small></span><a href="#route" class="link">Διαδρομή ›</a></div>
+    <ul class="jx-list">${plan.length ? plan.join("") : `<li class="jx-empty">${art("calendar")}<span>Τίποτα προγραμματισμένο. Πάτα «Ξεκίνα τη μέρα μου» και ο Jarvis διαλέγει από τις προτεραιότητες.</span></li>`}</ul>
+  </section>
+  ${overdue.length ? `<section class="section"><div class="section-head"><h2 class="bad-h">Εκπρόθεσμα follow-ups</h2>${overdue.length > 5 ? `<a href="#tasks" class="link">Όλα (${overdue.length}) ›</a>` : ""}</div><div class="panel"><ul class="list">${overdue.slice(0, 5).map(taskRow).join("")}</ul></div></section>` : ""}
+  ${pri.length ? `<section class="section"><div class="section-head"><h2>Προτεραιότητες</h2><span class="muted small">ποιους να δεις πρώτα</span></div><div class="panel"><ul class="list">${pri.map((p) => shopRow(p.s, p.why.join(" · "), null, true)).join("")}</ul></div></section>` : ""}
+  <button class="jx-ask" data-action="talk"><span class="jx-ask-ic">${ic('<path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4 3v-3H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/><path d="M8 10h8M8 13h5"/>')}</span><span class="grow"><b>Ρώτα τον JARVIS</b><small>«Ποιες εκκρεμότητες έχω αυτή την εβδομάδα;»</small></span><span class="chev">${ICON.chev}</span></button>
   <div class="jx-stats">
-    ${card("shop-filter", "active", ic('<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0M16 5.5a3 3 0 0 1 0 6M18 19a5 5 0 0 0-2.5-4.3"/>'), customers.length, "Πελάτες", newThisWeek ? `<span class="up">▲ +${newThisWeek}</span> αυτή την εβδομάδα` : `${state.shops.length} μαγαζιά συνολικά`)}
-    ${card("go", "agenda", ic('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 14h2M12 14h2M16 14h0M8 17h2"/>'), planned.length + doneToday.length, "Σημερινές επισκέψεις", `${doneToday.length} ολοκληρώθηκαν`)}
-    ${card("go", "settings", ic('<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/><path d="M12 12l7-7M16 5h3v3"/>'), pct + "%", "Στόχος μήνα", `${monthVisits}/${target} επισκέψεις`, `<span class="jx-bar"><span style="width:${pct}%"></span></span>`)}
-    ${card("go", "agenda", ic('<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 12l2 2 4-4"/>'), open.length, "Εκκρεμότητες", overdue.length ? `<span class="warn">${overdue.length} εκπρόθεσμες</span>` : "όλες εντός χρόνου")}
+    ${card("shop-filter", "active", ic('<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0M16 5.5a3 3 0 0 1 0 6M18 19a5 5 0 0 0-2.5-4.3"/>'), customers.length, "Πελάτες", newCustomers ? `<span class="up">+${newCustomers}</span> νέοι τις τελευταίες 7 μέρες` : `${plural(state.shops.length, "μαγαζί", "μαγαζιά")} συνολικά`)}
+    ${card("go", "settings", ic('<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/><path d="M12 12l7-7M16 5h3v3"/>'), pct + "%", "Στόχος επισκέψεων", `${monthVisits} από ${target} αυτόν τον μήνα`, `<span class="jx-bar"><span style="width:${pct}%"></span></span>`)}
+    ${card("go", "sales", ICON.trend, sales.targets ? `${sales.hit}/${sales.targets}` : sales.won, sales.targets ? "Στόχοι προϊόντων" : "Νέοι πελάτες μήνα", sales.targets ? `${sales.won} νέοι πελάτες τον μήνα` : "Όρισε στόχους στις Πωλήσεις")}
+    ${card("go", "tasks", ic('<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 12l2 2 4-4"/>'), open.length, "Ανοιχτές εργασίες", overdue.length ? `<span class="warn">${overdue.length} εκπρόθεσμες</span>` : "όλες εντός χρόνου")}
   </div>
   <button class="jx-card jx-map" data-action="go" data-v="map">
     ${territoryMap()}
-    <span class="jx-map-head"><span class="jx-pin">${ic('<path d="M12 21s-6.5-6-6.5-11.5a6.5 6.5 0 0 1 13 0C18.5 15 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.4"/>')}</span><span><b>Η περιοχή σου</b><small>Οι πελάτες σου. Η διαδρομή σου.</small></span><span class="chev">${ICON.chev}</span></span>
-    <span class="jx-map-btn">${ICON.map} Χάρτης</span>
+    <span class="jx-map-head"><span class="jx-pin">${ic('<path d="M12 21s-6.5-6-6.5-11.5a6.5 6.5 0 0 1 13 0C18.5 15 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.4"/>')}</span><span><b>Η περιοχή σου</b><small>${state.shops.filter(hasGeo).length} από ${plural(state.shops.length, "μαγαζί", "μαγαζιά")} στον χάρτη</small></span><span class="chev">${ICON.chev}</span></span>
   </button>
-  <section class="jx-card jx-sched">
-    <div class="jx-sched-head"><span class="jx-ic">${ic('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 14h2M12 14h2M8 17h2"/>')}</span><span class="grow"><b>Σημερινό πρόγραμμα</b><small>${plural(planned.length, "επίσκεψη", "επισκέψεις")} · ${plural(todayTasks.length + overdue.length, "εργασία", "εργασίες")}</small></span><a href="#route" class="link">Διαδρομή ›</a></div>
-    <div class="jx-sched-body">
-      <ul class="jx-list">${rows.length ? rows.map(row).join("") : `<li class="jx-empty">${art("calendar")}<span>Τίποτα προγραμματισμένο για σήμερα.</span></li>`}</ul>
-      <div class="jx-suggest"><span class="jx-bulb">${ic('<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/>')}</span><b>Ο JARVIS προτείνει</b><p>${esc(sug.text)}</p>${sug.id ? `<button class="jx-outline" data-action="open" data-id="${esc(sug.id)}">Λεπτομέρειες</button>` : `<button class="jx-outline" data-action="new-shop">Νέο μαγαζί</button>`}</div>
-    </div>
-  </section>
-  <button class="jx-ask" data-action="talk"><span class="jx-ask-ic">${ic('<path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4 3v-3H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/><path d="M8 10h8M8 13h5"/>')}</span><span class="grow"><b>Ρώτα τον JARVIS</b><small>«Ποια μαγαζιά να επισκεφτώ σήμερα;»</small></span><span class="chev">${ICON.chev}</span></button>
-  ${weekCard()}
-  ${quiet.length ? `<section class="section"><div class="section-head"><h2>Χρειάζονται επίσκεψη</h2><span class="muted small">${QUIET_DAYS}+ μέρες</span></div><div class="panel"><ul class="list">${quiet.map((s) => shopRow(s, s.lastVisit ? `${daysSinceVisit(s)} μέρες από την επίσκεψη` : "Καμία επίσκεψη")).join("")}</ul></div></section>` : ""}`;
+  ${weekCard()}`;
+}
+function startDay() {
+  const t = todayISO();
+  let ids = state.shops.filter((s) => s.nextVisit === t).map((s) => s.id);
+  if (ids.length < 4) ids = [...ids, ...priorities().map((p) => p.s.id).filter((id) => !ids.includes(id)).slice(0, 6 - ids.length)];
+  state.route = { day: t, ids, manual: false, all: false }; saveRoute();
+  try { localStorage.setItem("jarvis-day", t); } catch {}
+  nav("route");
+  locate().then(() => { if (state.view === "route") render(); }).catch(() => {});
 }
 
 function weekCard() {
@@ -351,7 +395,7 @@ function weekCard() {
   const bars = counts.map((n, i) => { const h = Math.max(4, (n / max) * (H - 26)); const x = i * bw + 6, y = H - 16 - h; return `<rect class="wbar ${i === 7 ? "now" : ""}" x="${x}" y="${y}" width="${bw - 12}" height="${h}" rx="5"><title>${fmtDate(weeks[i])}: ${n}</title></rect>${n ? `<text x="${x + (bw - 12) / 2}" y="${y - 4}" text-anchor="middle">${n}</text>` : ""}<text class="wl" x="${x + (bw - 12) / 2}" y="${H - 2}" text-anchor="middle">${new Date(weeks[i] + "T00:00:00").getDate()}/${new Date(weeks[i] + "T00:00:00").getMonth() + 1}</text>`; }).join("");
   const now = counts[7], prev = counts[6];
   const delta = prev ? Math.round((now - prev) / prev * 100) : null;
-  return `<section class="panel week-card"><div class="week-head"><div><span class="eyebrow">Επισκέψεις εβδομάδας</span><div class="week-num">${now}${delta != null && now ? `<span class="trend ${delta >= 0 ? "up" : "down"}">${delta >= 0 ? "▲" : "▼"} ${Math.abs(delta)}%</span>` : ""}</div></div><span class="muted small">8 εβδομάδες</span></div>
+  return `<section class="panel week-card"><div class="week-head"><div><span class="eyebrow">Επισκέψεις εβδομάδας</span><div class="week-num">${now}${delta != null && now ? `<span class="trend ${delta >= 0 ? "up" : "down"}">${arrow(delta >= 0)} ${Math.abs(delta)}%</span>` : ""}</div></div><span class="muted small">8 εβδομάδες</span></div>
     <svg class="week-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Επισκέψεις ανά εβδομάδα">${bars}</svg></section>`;
 }
 
@@ -386,6 +430,7 @@ function viewMore() {
   const openTasks = state.tasks.filter((x) => !x.done).length;
   return `${banner()}<div class="panel profile">${avatar(state.email, "ph big")}<div class="grow"><div class="title">${esc(state.email || "")}</div><div class="sub">${esc(syncText())}</div></div></div>
   <section class="section"><h3 class="group">Αναλύσεις</h3><div class="panel"><ul class="list">
+    ${item("sales", ICON.trend, "Πωλήσεις & στόχοι", "Στόχοι, διανομή, ευκαιρίες, χαμένες ευκαιρίες")}
     ${item("map", ICON.map, "Χάρτης", `${state.shops.filter(hasGeo).length} από ${plural(state.shops.length, "μαγαζί", "μαγαζιά")} στον χάρτη`)}
     ${item("prospects", ICON.star, "Υποψήφιοι", `${prospects} με κατάταξη βαθμολογίας`)}
     ${item("market", ICON.chart, "Μερίδιο αγοράς", "Φιάλες στο back bar ανά εταιρεία")}
@@ -435,31 +480,155 @@ function routeMap(stops, start) {
   const line = pts.map((p) => xy(p).map((v) => v.toFixed(1)).join(",")).join(" ");
   return `<svg class="route-map tm" viewBox="0 0 ${W} ${H}" aria-hidden="true"><polyline points="${line}"/>${start ? (() => { const [x, y] = xy(start); return `<circle class="me" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="6"/>`; })() : ""}${stops.map((s, i) => { const [x, y] = xy(s); return `<g class="stop ${esc(s.status)}"><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="9"/><text x="${x.toFixed(1)}" y="${(y + 3.5).toFixed(1)}" text-anchor="middle">${i + 1}</text></g>`; }).join("")}</svg>`;
 }
-function viewRoute() {
+/* The day route is kept per day on this phone, so it survives closing the app. */
+function routeState() {
   const t = todayISO();
-  if (!state.route) state.route = { ids: state.shops.filter((s) => s.nextVisit === t && hasGeo(s)).map((s) => s.id) };
-  const sel = new Set(state.route.ids.filter((id) => shopById(id)));
+  if (state.route && state.route.day === t) return state.route;
+  let saved = null; try { saved = JSON.parse(localStorage.getItem("jarvis-route") || "null"); } catch {}
+  state.route = saved && saved.day === t ? saved : { day: t, ids: state.shops.filter((s) => s.nextVisit === t).map((s) => s.id), manual: false, all: false };
+  if (state.route && !state.route.day) state.route.day = t;
+  return state.route;
+}
+function saveRoute() { try { localStorage.setItem("jarvis-route", JSON.stringify(state.route)); } catch {} }
+function viewRoute() {
+  const t = todayISO(), R = routeState();
+  R.ids = R.ids.filter((id) => shopById(id));
   const here = state.here && Date.now() - state.here.at < 30 * 60000 ? state.here : null;
-  const stops = orderStops(state.shops.filter((s) => sel.has(s.id) && hasGeo(s)), here);
-  const legs = stops.map((s, i) => i ? distKm(stops[i - 1], s) : here ? distKm(here, s) : 0);
+  const chosen = R.ids.map(shopById);
+  const geo = chosen.filter(hasGeo), noGeo = chosen.filter((s) => !hasGeo(s));
+  const stops = R.manual ? chosen : orderStops(geo, here).concat(noGeo);
+  const legs = stops.map((s, i) => !hasGeo(s) ? 0 : i ? (hasGeo(stops[i - 1]) ? distKm(stops[i - 1], s) : 0) : here ? distKm(here, s) : 0);
   const km = legs.reduce((a, b) => a + b, 0);
-  const max = 10, go = stops.slice(0, max);
+  const max = 10, go = stops.filter(hasGeo).slice(0, max);
   const ll = (p) => `${p.lat},${p.lng}`;
-  const gmaps = go.length ? "https://www.google.com/maps/dir/?api=1&travelmode=driving" + (here ? "&origin=" + ll(here) : "") + "&destination=" + ll(go[go.length - 1]) + ((here ? go.slice(0, -1) : go.slice(1, -1)).length ? "&waypoints=" + encodeURIComponent((here ? go.slice(0, -1) : go.slice(1, -1)).map(ll).join("|")) : "") + (here ? "" : "&origin=" + ll(go[0])) : "";
-  const why = (s) => s.nextVisit === t ? "Προγραμματισμένη σήμερα" : isQuiet(s) ? (s.lastVisit ? `${daysSinceVisit(s)} μέρες χωρίς επίσκεψη` : "Καμία επίσκεψη ακόμα") : s.status === "prospect" && scoreOf(s) != null ? `Υποψήφιος ${scoreOf(s)}/100` : STATUSES[s.status] || "";
-  const rank = (s) => (s.nextVisit === t ? 0 : isQuiet(s) ? 1 : s.status === "prospect" ? 2 : 3);
-  const pool = state.shops.filter((s) => hasGeo(s) && !sel.has(s.id) && s.status !== "closed" && s.status !== "lost")
-    .sort((a, b) => rank(a) - rank(b) || (here ? distKm(here, a) - distKm(here, b) : (a.name || "").localeCompare(b.name || "")));
-  const noGeo = state.shops.filter((s) => !hasGeo(s)).length;
-  const cand = (s) => `<li><button class="item pick" data-action="route-toggle" data-id="${esc(s.id)}"><span class="pick-box">${ICON.plus}</span>${shopAvatar(s)}<div class="grow"><div class="title">${esc(s.name)}</div><div class="sub">${esc([s.area, why(s), here ? fmtDist(distKm(here, s)) : ""].filter(Boolean).join(" · "))}</div></div></button></li>`;
+  const mids = here ? go.slice(0, -1) : go.slice(1, -1);
+  const gmaps = go.length ? "https://www.google.com/maps/dir/?api=1&travelmode=driving&origin=" + ll(here || go[0]) + "&destination=" + ll(go[go.length - 1]) + (mids.length ? "&waypoints=" + encodeURIComponent(mids.map(ll).join("|")) : "") : "";
+  const visited = visitedOn(t);
+  const pri = new Map(priorities().map((p) => [p.s.id, p]));
+  const why = (s) => s.nextVisit === t ? "Προγραμματισμένη σήμερα" : pri.has(s.id) ? pri.get(s.id).why.join(" · ") : s.status === "prospect" && scoreOf(s) != null ? `Υποψήφιος ${scoreOf(s)}/100` : STATUSES[s.status] || "";
+  const sel = new Set(R.ids);
+  const pool = state.shops.filter((s) => !sel.has(s.id) && s.status !== "closed" && s.status !== "lost" && (R.all || pri.has(s.id) || s.nextVisit === t));
+  const groups = {}; pool.forEach((s) => (groups[areaOf(s)] = groups[areaOf(s)] || []).push(s));
+  const score = (s) => s.nextVisit === t ? 1000 : pri.has(s.id) ? pri.get(s.id).score : 0;
+  const areaScore = (a) => groups[a].reduce((m, s) => Math.max(m, score(s)), 0);
+  const areas = Object.keys(groups).sort((a, b) => areaScore(b) - areaScore(a) || a.localeCompare(b));
+  const cand = (s) => `<li><button class="item pick" data-action="route-toggle" data-id="${esc(s.id)}"><span class="pick-box">${ICON.plus}</span>${shopAvatar(s)}<div class="grow"><div class="title">${esc(s.name)}</div><div class="sub">${esc([why(s), here && hasGeo(s) ? fmtDist(distKm(here, s)) : "", hasGeo(s) ? "" : "χωρίς τοποθεσία"].filter(Boolean).join(" · "))}</div></div></button></li>`;
+  const stopTasks = state.tasks.filter((x) => !x.done && sel.has(x.shopId)).sort((a, b) => (a.due || "9999").localeCompare(b.due || "9999"));
+  const stopRow = (s, i) => `<li class="item stop-row ${visited.has(s.id) ? "visited" : ""}"><span class="stop-n">${visited.has(s.id) ? "✓" : i + 1}</span><div class="grow"><div class="title"><a href="#" data-action="open" data-id="${esc(s.id)}">${esc(s.name)}</a></div><div class="sub">${esc([s.area, legs[i] ? "+" + fmtDist(legs[i]) : "", hasGeo(s) ? "" : "χωρίς τοποθεσία", visited.has(s.id) ? "έγινε" : why(s)].filter(Boolean).join(" · "))}</div>${visited.has(s.id) ? "" : `<div class="stop-acts">${quickActs(s)}</div>`}</div>
+    <div class="stop-move"><button class="icon-btn small" data-action="route-move" data-id="${esc(s.id)}" data-v="-1" aria-label="Πιο νωρίς" ${i ? "" : "disabled"}>${ic('<path d="M6 15l6-6 6 6"/>')}</button><button class="icon-btn small" data-action="route-move" data-id="${esc(s.id)}" data-v="1" aria-label="Πιο αργά" ${i < stops.length - 1 ? "" : "disabled"}>${ic('<path d="M6 9l6 6 6-6"/>')}</button><button class="icon-btn small" data-action="route-toggle" data-id="${esc(s.id)}" aria-label="Αφαίρεση">${ic('<path d="M6 6l12 12M18 6L6 18"/>')}</button></div></li>`;
   return `${banner()}
-  <section class="section"><div class="panel route-card">${stops.length ? routeMap(stops, here) : ""}
-    <div class="route-sum">${stops.length ? `<b class="num">${stops.length}</b> ${stops.length === 1 ? "στάση" : "στάσεις"} · <b class="num">${km.toFixed(1)} km</b> · περίπου <b class="num">${Math.round(km / 22 * 60 + stops.length * 20)}</b> λεπτά μαζί με 20' ανά επίσκεψη` : "Διάλεξε μαγαζιά από κάτω και ο Jarvis τα βάζει στην καλύτερη σειρά."}</div>
+  <section class="section"><div class="panel route-card">${geo.length ? routeMap(stops.filter(hasGeo), here) : ""}
+    <div class="route-sum">${stops.length ? `<b class="num">${stops.length}</b> ${stops.length === 1 ? "στάση" : "στάσεις"}${geo.length ? ` · <b class="num">${km.toFixed(1)} km</b> · περίπου <b class="num">${Math.round(km / 22 * 60 + stops.length * 20)}</b> λεπτά μαζί με 20' ανά επίσκεψη` : ""}${visited.size ? ` · <b class="num">${stops.filter((s) => visited.has(s.id)).length}</b> έγιναν` : ""}` : "Διάλεξε πελάτες από κάτω. Ο Jarvis σου δείχνει πρώτα τις προτεραιότητες, ομαδοποιημένες ανά περιοχή."}</div>
     ${here ? "" : `<div class="row-actions"><button class="btn small" data-action="route-locate">${ICON.locate} Ξεκίνα από εκεί που είμαι</button></div>`}
   </div></section>
-  ${stops.length ? `<section class="section"><div class="section-head"><h2>Η σειρά σου</h2>${canEdit() ? `<button class="link" data-action="route-plan">Βάλ' τα στο σημερινό πρόγραμμα</button>` : ""}</div><div class="panel"><ol class="list stops">${stops.map((s, i) => `<li class="item"><span class="stop-n">${i + 1}</span><div class="grow"><div class="title"><a href="#" data-action="open" data-id="${esc(s.id)}">${esc(s.name)}</a></div><div class="sub">${esc([s.area, legs[i] ? "+" + fmtDist(legs[i]) : ""].filter(Boolean).join(" · "))}</div></div><button class="icon-btn small" data-action="route-toggle" data-id="${esc(s.id)}" aria-label="Αφαίρεση">${ic('<path d="M6 6l12 12M18 6L6 18"/>')}</button></li>`).join("")}</ol></div>
-    <div class="row-actions"><a class="btn primary" href="${gmaps}" target="_blank" rel="noopener">${ICON.nav} Άνοιγμα στο Google Maps</a></div>${stops.length > max ? `<p class="muted small">Το Google Maps δέχεται έως ${max} στάσεις μαζί. Ανοίγουν οι πρώτες ${max}.</p>` : ""}</section>` : ""}
-  <section class="section"><h2>Πρόσθεσε στάσεις</h2><div class="panel"><ul class="list">${pool.length ? pool.slice(0, 40).map(cand).join("") : emptyLi("pin", "Δεν υπάρχουν άλλα μαγαζιά με τοποθεσία.")}</ul></div>${noGeo ? `<p class="muted small">${plural(noGeo, "μαγαζί δεν έχει", "μαγαζιά δεν έχουν")} τοποθεσία, γι' αυτό δεν εμφανίζονται εδώ. Πρόσθεσε τοποθεσία από την επεξεργασία του μαγαζιού.</p>` : ""}</section>`;
+  ${stops.length ? `<section class="section"><div class="section-head"><h2>Η σειρά σου</h2>${R.manual ? `<button class="link" data-action="route-auto">Βέλτιστη σειρά</button>` : `<span class="muted small">με τα βέλη αλλάζεις τη σειρά</span>`}</div><div class="panel"><ol class="list stops">${stops.map(stopRow).join("")}</ol></div>
+    <div class="row-actions">${gmaps ? `<a class="btn primary" href="${gmaps}" target="_blank" rel="noopener">${ICON.nav} Άνοιγμα στο Google Maps</a>` : ""}${canEdit() ? `<button class="btn" data-action="route-plan">Βάλ' τα στο σημερινό πρόγραμμα</button>` : ""}</div>${go.length < stops.filter(hasGeo).length ? `<p class="muted small">Το Google Maps δέχεται έως ${max} στάσεις μαζί. Ανοίγουν οι πρώτες ${max}.</p>` : ""}</section>` : ""}
+  ${stopTasks.length ? `<section class="section"><h2>Θέματα για τις στάσεις σου</h2><div class="panel"><ul class="list">${stopTasks.slice(0, 8).map(taskRow).join("")}</ul></div></section>` : ""}
+  <section class="section"><div class="section-head"><h2>Πρόσθεσε στάσεις</h2></div>
+    <div class="chips"><button class="chip" data-action="route-all" data-v="0" aria-pressed="${!R.all}">Προτεραιότητες</button><button class="chip" data-action="route-all" data-v="1" aria-pressed="${!!R.all}">Όλο το χαρτοφυλάκιο</button></div>
+    ${areas.length ? areas.map((a) => `<div class="section-head area-head"><h3 class="group"><i class="area-dot" style="--h:${hue(a)}"></i>${esc(a)} <span class="muted num">${groups[a].length}</span></h3><button class="link" data-action="route-area" data-v="${esc(a)}">+ Όλα</button></div><div class="panel"><ul class="list">${groups[a].sort((x, y) => score(y) - score(x) || (x.name || "").localeCompare(y.name || "")).slice(0, 25).map(cand).join("")}</ul></div>`).join("")
+      : `<div class="panel"><ul class="list">${emptyLi("pin", R.all ? "Όλα τα μαγαζιά είναι ήδη στη διαδρομή." : pri.size ? "Όλες οι προτεραιότητες είναι ήδη στη διαδρομή. Πάτα «Όλο το χαρτοφυλάκιο» για περισσότερα." : "Καμία προτεραιότητα σήμερα. Πάτα «Όλο το χαρτοφυλάκιο» για να διαλέξεις.")}</ul></div>`}
+  </section>`;
+}
+
+/* ---------- sales: distribution, opportunities, targets (all from stored records) ---------- */
+const ym = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+const monthAdd = (m, n) => { const d = new Date(m + "-01T00:00:00"); d.setMonth(d.getMonth() + n); return ym(d); };
+/* Products a shop takes: consumption or orders in the last 6 months, its product list, and our brands on its back bar. */
+function carries(s) {
+  const since = monthAdd(todayISO().slice(0, 7), -5), mine = norm(state.settings.myCompany), out = new Map();
+  const add = (name) => { const k = norm(name).trim(); if (k && !out.has(k)) out.set(k, String(name).trim()); };
+  (s.consumption || []).filter((c) => (c.month || "") >= since && Number(c.qty) > 0).forEach((c) => add(c.product));
+  (s.orders || []).filter((o) => (o.date || "").slice(0, 7) >= since).forEach((o) => (o.items || []).forEach((i) => add(i.product)));
+  (s.products || []).forEach((p) => add(p.name));
+  if (mine) (s.backbar || []).filter((b) => norm(b.company) === mine).forEach((b) => add(b.brand));
+  return out;
+}
+function distribution() {
+  const cust = state.shops.filter((s) => s.status === "active" && !s.example);
+  const counts = new Map();
+  cust.forEach((s) => carries(s).forEach((name, k) => { const c = counts.get(k) || { name, shops: [] }; c.shops.push(s); counts.set(k, c); }));
+  return { total: cust.length, rows: [...counts.values()].sort((a, b) => b.shops.length - a.shops.length || a.name.localeCompare(b.name)) };
+}
+function posmSpread() {
+  const cust = state.shops.filter((s) => s.status === "active" && !s.example), counts = new Map();
+  cust.forEach((s) => new Set((s.posm || []).map((p) => p.type).filter(Boolean)).forEach((t) => counts.set(t, (counts.get(t) || 0) + 1)));
+  return { total: cust.length, counts };
+}
+/* What is missing at one shop, with the evidence. */
+function oppsFor(s, dist = distribution(), posm = posmSpread()) {
+  if (!["active", "az"].includes(s.status)) return [];
+  const have = carries(s), out = [], mine = norm(state.settings.myCompany);
+  const common = (n, total) => total >= 2 && n >= 2 && n / total >= 0.3;
+  dist.rows.filter((r) => common(r.shops.length, dist.total) && !have.has(norm(r.name))).slice(0, 4)
+    .forEach((r) => out.push({ kind: "product", key: r.name, text: `Δεν παίρνει ${r.name}`, why: `Το παίρνουν ${r.shops.length} από ${dist.total} πελάτες σου`, weight: r.shops.length / dist.total }));
+  if (mine) {
+    const ourCats = new Set((s.backbar || []).filter((b) => norm(b.company) === mine).map((b) => b.category).filter(Boolean));
+    const known = new Set(state.catalogues.filter((c) => norm(c.company) === mine).flatMap((c) => (c.items || []).map((i) => i.category)).filter(Boolean));
+    (s.backbar || []).filter((b) => b.category && norm(b.company) !== mine && b.company && known.has(b.category) && !ourCats.has(b.category)).slice(0, 2)
+      .forEach((b) => out.push({ kind: "product", key: b.brand, text: `${tr(b.category)}: έχει ${b.brand} (${b.company})`, why: "Δεν έχει δικό μας προϊόν σε αυτή την κατηγορία στο back bar", weight: 0.5 }));
+  }
+  const hasPosm = new Set((s.posm || []).map((p) => p.type));
+  [...posm.counts.entries()].filter(([t, n]) => common(n, posm.total) && !hasPosm.has(t)).sort((a, b) => b[1] - a[1]).slice(0, 2)
+    .forEach(([t, n]) => out.push({ kind: "posm", key: t, text: `Λείπει POSM: ${tr(t)}`, why: `Το έχουν ${n} από ${posm.total} πελάτες σου`, weight: n / posm.total * 0.8 }));
+  return out.slice(0, 6);
+}
+function salesData(off = 0) {
+  const t = todayISO(), cur = monthAdd(t.slice(0, 7), off), prev = monthAdd(cur, -1);
+  const shops = state.shops.filter((s) => !s.example);
+  const dim = new Date(Number(cur.slice(0, 4)), Number(cur.slice(5, 7)), 0).getDate();
+  const frac = off === 0 ? Number(t.slice(8, 10)) / dim : 1;
+  const vol = (m) => { const map = new Map(); shops.forEach((s) => (s.consumption || []).filter((c) => c.month === m).forEach((c) => { const k = norm(c.product); const r = map.get(k) || { name: c.product, unit: c.unit || "", qty: 0, shops: new Set() }; r.qty += Number(c.qty) || 0; r.shops.add(s.id); if (!r.unit && c.unit) r.unit = c.unit; map.set(k, r); })); return map; };
+  const now = vol(cur), before = vol(prev);
+  const inM = (iso) => (iso || "").slice(0, 7) === cur;
+  const changes = shops.flatMap((s) => (s.statusHistory || []).filter((h) => inM(h.at)).map((h) => ({ ...h, shop: s })));
+  const won = changes.filter((h) => h.to === "active" && h.from !== "active");
+  const lost = changes.filter(LOST);
+  const targets = (state.settings.targets || []).map((x, i) => { const r = now.get(norm(x.product)), goal = Number(x.qty) || 0, got = r ? r.qty : 0; return { product: x.product, i, goal, got, unit: x.unit || (r ? r.unit : ""), pct: goal ? got / goal : 0 }; });
+  const visitTarget = Number(state.settings.visitTarget) || 40, accountsTarget = Number(state.settings.accountsTarget) || 0;
+  const visits = state.visits.filter((v) => (v.date || "").slice(0, 7) === cur).length;
+  /* by customer: this month vs last month, per product */
+  const byShop = shops.map((s) => { const c = (m) => { const map = new Map(); (s.consumption || []).filter((e) => e.month === m).forEach((e) => { const k = norm(e.product); const r = map.get(k) || { name: e.product, unit: e.unit || "", qty: 0 }; r.qty += Number(e.qty) || 0; map.set(k, r); }); return map; }; return { s, now: c(cur), before: c(prev) }; }).filter((x) => x.now.size || x.before.size);
+  /* missed opportunities */
+  const missed = [];
+  byShop.filter((x) => x.s.status === "active").forEach((x) => x.before.forEach((b, k) => { const n = x.now.get(k); const got = n ? n.qty : 0; const exp = b.qty * frac; if (b.qty > 0 && (off !== 0 || frac >= 0.5) && got < exp * 0.7) missed.push({ id: x.s.id, text: `${x.s.name}: ${b.name} ${got ? "έπεσε" : "χωρίς παραγγελία"}`, sub: `${fmtQty(got)} ${b.unit} αυτόν τον μήνα, ${fmtQty(b.qty)} ${b.unit} τον προηγούμενο`, w: 3 }); }));
+  shops.filter((s) => s.status === "active").forEach((s) => { const lo = lastOrder(s), lc = (s.consumption || []).map((c) => c.month).sort().pop(); const last = [lo && lo.date, lc && lc + "-28"].filter(Boolean).sort().pop(); if (last && daysBetween(last, t) > 60) missed.push({ id: s.id, text: `${s.name}: καμία παραγγελία πάνω από 60 μέρες`, sub: `Τελευταία κίνηση ${fmtMonth(last.slice(0, 7))}`, w: 2 }); });
+  shops.filter((s) => s.nextVisit && s.nextVisit < t && inM(s.nextVisit) && (!s.lastVisit || s.lastVisit < s.nextVisit)).forEach((s) => missed.push({ id: s.id, text: `Χάθηκε η επίσκεψη στο ${s.name}`, sub: `Ήταν για ${fmtDate(s.nextVisit)}`, w: 1 }));
+  shops.filter((s) => s.status === "prospect" && (scoreOf(s) ?? 0) >= 60 && (!s.lastVisit || daysSinceVisit(s) >= 30)).forEach((s) => missed.push({ id: s.id, text: `Υποψήφιος ${scoreOf(s)}/100 χωρίς επίσκεψη: ${s.name}`, sub: s.lastVisit ? `Τελευταία επίσκεψη ${fmtDate(s.lastVisit)}` : "Καμία επίσκεψη ακόμα", w: 1 }));
+  lost.forEach((h) => missed.push({ id: h.shop.id, text: `Χάσαμε το ${h.shop.name}`, sub: `${STATUSES[h.to] || h.to}${h.reason ? " · " + h.reason : ""}`, w: 4 }));
+  return { cur, prev, off, frac, now, before, won, lost, targets, visits, visitTarget, accountsTarget, byShop, missed: missed.sort((a, b) => b.w - a.w) };
+}
+const fmtQty = (n) => new Intl.NumberFormat("el-GR", { maximumFractionDigits: 1 }).format(Number(n) || 0);
+function salesSummary() { const d = salesData(0); return { targets: d.targets.length, hit: d.targets.filter((x) => x.pct >= 1).length, won: d.won.length }; }
+function viewSales() {
+  const off = state.salesMonth || 0, d = salesData(off), dist = distribution(), posm = posmSpread();
+  const mlabel = (m) => new Date(m + "-01T00:00:00").toLocaleDateString("el-GR", { month: "long", year: "numeric" });
+  const tile = (n, l, cls = "") => `<div class="stat ${cls}"><b>${n}</b><span>${l}</span></div>`;
+  const bar = (name, pct, val, pace, act = "") => `<div class="share-row target-row"><span class="name">${name}</span><span class="track">${pace != null && pace < 1 ? `<i class="pace" style="left:${(pace * 100).toFixed(1)}%" title="Εκεί που θα έπρεπε να είσαι σήμερα"></i>` : ""}<span class="fill ${pct >= 1 ? "full" : pace != null && pct < pace * 0.8 ? "behind" : ""}" style="width:${Math.min(100, pct * 100).toFixed(1)}%"></span></span><span class="val">${val}</span>${act}</div>`;
+  const pace = off === 0 ? d.frac : null;
+  const targetRows = [
+    bar("Επισκέψεις", d.visits / d.visitTarget, `${d.visits}/${d.visitTarget}`, pace),
+    ...(d.accountsTarget ? [bar("Νέοι πελάτες", d.won.length / d.accountsTarget, `${d.won.length}/${d.accountsTarget}`, pace)] : []),
+    ...d.targets.map((x) => bar(esc(x.product), x.pct, `${fmtQty(x.got)}/${fmtQty(x.goal)} ${esc(x.unit)}`, pace, canEdit() ? `<button class="icon-btn small" data-action="target-rm" data-v="${x.i}" aria-label="Διαγραφή στόχου">${ic('<path d="M6 6l12 12M18 6L6 18"/>')}</button>` : "")),
+  ].join("");
+  const prodRows = [...d.now.values(), ...[...d.before.entries()].filter(([k]) => !d.now.has(k)).map(([, r]) => ({ ...r, qty: 0 }))].sort((a, b) => b.qty - a.qty);
+  const delta = (a, b) => b ? (a === b ? `<span class="trend">ίδιο</span>` : `<span class="trend ${a > b ? "up" : "down"}">${arrow(a > b)} ${Math.abs(Math.round((a - b) / b * 100))}%</span>`) : a ? `<span class="trend up">νέο</span>` : "";
+  const topShops = d.byShop.filter((x) => x.now.size).map((x) => ({ ...x, n: [...x.now.values()].reduce((a, r) => a + r.qty, 0) })).sort((a, b) => b.n - a.n).slice(0, 12);
+  const allOpps = state.shops.filter((s) => s.status === "active" && !s.example).flatMap((s) => oppsFor(s, dist, posm).map((o) => ({ ...o, s }))).sort((a, b) => b.weight - a.weight).slice(0, 15);
+  const noData = !d.now.size && !d.before.size;
+  return `${banner()}<div class="chips">${[[0, "Αυτός ο μήνας"], [-1, "Προηγούμενος"], [-2, "Πριν 2 μήνες"]].map(([k, l]) => `<button class="chip" data-action="sales-month" data-v="${k}" aria-pressed="${off === k}">${l}</button>`).join("")}</div>
+  <p class="muted small">${esc(mlabel(d.cur))}${off === 0 ? ` · ημέρα ${todayISO().slice(8, 10)} από ${Math.round(Number(todayISO().slice(8, 10)) / d.frac)}` : ""}. Όλα τα νούμερα βγαίνουν από τις καταχωρίσεις σου: παραγγελίες, κατανάλωση, επισκέψεις και αλλαγές κατάστασης.</p>
+  <div class="stats">${tile(`${d.visits}`, "Επισκέψεις")}${tile(d.won.length, "Νέοι πελάτες", d.won.length ? "good" : "")}${tile(d.lost.length, "Χάσαμε", d.lost.length ? "bad" : "")}${tile(d.targets.length ? `${d.targets.filter((x) => x.pct >= 1).length}/${d.targets.length}` : "–", "Στόχοι που πιάστηκαν")}</div>
+  <section class="section"><div class="section-head"><h2>Στόχοι</h2>${pace != null ? `<span class="muted small"><i class="pace-key"></i> ρυθμός μέχρι σήμερα</span>` : ""}</div><div class="panel"><div class="share">${targetRows}</div>
+    ${canEdit() ? `<details class="adder"><summary>+ Στόχος προϊόντος για κάθε μήνα</summary><form class="inline-form" data-form="target"><div class="grid2">${fld({ form: "target", name: "product", label: "Προϊόν", list: "dl-products", required: true })}${fld({ form: "target", name: "qty", label: "Ποσότητα τον μήνα", type: "number", required: true, attrs: 'min="1" step="any" inputmode="decimal"' })}${fld({ form: "target", name: "unit", label: "Μονάδα", ph: "κιβώτια" })}</div><div class="row-actions"><button class="btn primary small" type="submit">Αποθήκευση στόχου</button></div></form></details>` : ""}</div>
+    <p class="muted small">Ο στόχος επισκέψεων και νέων πελατών αλλάζει από τις <a href="#settings" class="link small">Ρυθμίσεις</a>.</p></section>
+  ${noData ? `<section class="section"><div class="panel">${emptyDiv("chart", "Δεν υπάρχουν ακόμα όγκοι πωλήσεων. Μπαίνουν όταν καταγράφεις παραγγελία στην «Επίσκεψη», όταν το πεις στον Jarvis, από την καρτέλα Κατανάλωση ή από αρχείο πωλήσεων στα Αρχεία δουλειάς.")}</div></section>`
+    : `<section class="section"><h2>Όγκοι ανά προϊόν</h2><div class="panel table-wrap"><table><thead><tr><th>Προϊόν</th><th class="r">${esc(fmtMonth(d.cur))}</th><th class="r">${esc(fmtMonth(d.prev))}</th><th class="r">Μαγαζιά</th></tr></thead><tbody>${prodRows.map((r) => { const b = d.before.get(norm(r.name)); return `<tr><td>${esc(r.name)}</td><td class="r num">${fmtQty(r.qty)} ${esc(r.unit)} ${delta(r.qty, b ? b.qty : 0)}</td><td class="r num">${b ? fmtQty(b.qty) : "–"}</td><td class="r num">${r.shops ? r.shops.size : 0}</td></tr>`; }).join("")}</tbody></table></div>${off === 0 ? `<p class="muted small">Ο τρέχων μήνας δεν έχει τελειώσει, οπότε τα νούμερα είναι μέχρι σήμερα.</p>` : ""}</section>
+  <section class="section"><h2>Ανά πελάτη</h2><div class="panel"><ul class="list">${topShops.length ? topShops.map((x) => `<li><button class="item" data-action="open" data-id="${esc(x.s.id)}">${shopAvatar(x.s)}<div class="grow"><div class="title">${esc(x.s.name)}</div><div class="sub">${[...x.now.entries()].map(([k, r]) => { const b = x.before.get(k); return `${esc(r.name)} ${fmtQty(r.qty)} ${esc(r.unit)}${b ? ` (${b.qty <= r.qty ? "↑" : "↓"} από ${fmtQty(b.qty)})` : ""}`; }).join(" · ")}</div></div><span class="chev">${ICON.chev}</span></button></li>`).join("") : emptyLi("chart", "Καμία κίνηση αυτόν τον μήνα.")}</ul></div></section>`}
+  <section class="section"><div class="section-head"><h2>Διανομή προϊόντων</h2><span class="muted small">${plural(dist.total, "πελάτης", "πελάτες")}</span></div><div class="panel">${dist.rows.length ? `<div class="share">${dist.rows.slice(0, 12).map((r) => bar(esc(r.name), dist.total ? r.shops.length / dist.total : 0, `${r.shops.length}/${dist.total}`, null)).join("")}</div>` : emptyDiv("chart", "Η διανομή φαίνεται όταν οι πελάτες σου έχουν προϊόντα, παραγγελίες ή κατανάλωση.")}</div><p class="muted small">Πόσοι πελάτες παίρνουν κάθε προϊόν τους τελευταίους 6 μήνες (παραγγελίες, κατανάλωση, λίστα προϊόντων${state.settings.myCompany ? ", δικές μας φιάλες στο back bar" : ""}).</p></section>
+  <section class="section"><div class="section-head"><h2>Ευκαιρίες διανομής</h2><span class="muted small">τι λείπει σε ποιον</span></div><div class="panel"><ul class="list">${allOpps.length ? allOpps.map((o) => `<li><button class="item opp" data-action="open" data-id="${esc(o.s.id)}"><span class="opp-ic ${o.kind}">${o.kind === "posm" ? ICON.star : ICON.plus}</span><div class="grow"><div class="title">${esc(o.s.name)}: ${esc(o.text)}</div><div class="sub">${esc(o.why)}</div></div><span class="chev">${ICON.chev}</span></button></li>`).join("") : emptyLi("chart", "Καμία ευκαιρία ακόμα. Εμφανίζονται όταν ένα προϊόν ή POSM υπάρχει σε τουλάχιστον 30% των πελατών σου και λείπει από κάποιον.")}</ul></div></section>
+  <section class="section"><h2>Χαμένες ευκαιρίες</h2><div class="panel"><ul class="list">${d.missed.length ? d.missed.slice(0, 15).map((m) => `<li><button class="item alert warn" data-action="open" data-id="${esc(m.id)}"><i class="d"></i><div class="grow"><div class="title">${esc(m.text)}</div><div class="sub">${esc(m.sub)}</div></div><span class="chev">${ICON.chev}</span></button></li>`).join("") : emptyLi("tasks", "Τίποτα αυτόν τον μήνα.")}</ul></div></section>
+  ${d.won.length ? `<section class="section"><h2>Νέοι πελάτες</h2><div class="panel"><ul class="list">${d.won.map((h) => shopRow(h.shop, `${fmtDate((h.at || "").slice(0, 10))}${h.from ? " · από " + (STATUSES[h.from] || h.from) : ""}`)).join("")}</ul></div></section>` : ""}`;
 }
 
 /* ---------- status history (ours / ΑΖ / competition) ---------- */
@@ -778,7 +947,7 @@ function viewShops() {
   const byStatus = state.shops.filter((s) => state.shopFilter === "all" || s.status === state.shopFilter);
   const areaCounts = {}; byStatus.forEach((s) => { const a = areaOf(s); areaCounts[a] = (areaCounts[a] || 0) + 1; });
   let list = byStatus.filter((s) => state.areaFilter === "all" || areaOf(s) === state.areaFilter);
-  if (q) list = list.filter((s) => [s.name, s.area, s.city, s.owner, s.type, s.address].join(" ").toLowerCase().includes(q));
+  if (q) { const nq = norm(q); list = list.filter((s) => norm([s.name, s.area, s.city, s.owner, s.type, tr(s.type), s.address, s.insideInfo, ...(s.contacts || []).flatMap((c) => [c.name, c.role, c.phone, c.email]), ...(s.products || []).map((p) => p.name), ...(s.backbar || []).map((b) => b.brand)].join(" ")).includes(nq) || norm(String(q).replace(/\s/g, "")).length > 3 && (s.contacts || []).some((c) => String(c.phone || "").replace(/\s/g, "").includes(String(q).replace(/\s/g, "")))); }
   const prospectMode = state.shopFilter === "prospect";
   const groups = {};
   list.forEach((s) => (groups[areaOf(s)] = groups[areaOf(s)] || []).push(s));
@@ -796,9 +965,9 @@ function viewShops() {
     const ranked = list.slice().sort((a, b) => (scoreOf(b) ?? -1) - (scoreOf(a) ?? -1));
     body = `<p class="muted small">Κατάταξη με βαθμό στα 100 από τέσσερις αξιολογήσεις: ${CRITERIA.map((c) => c[1].toLowerCase()).join(", ")}.</p><div class="panel"><ul class="list">${ranked.map((s, i) => shopRow(s, "", i + 1)).join("")}</ul></div>`;
   } else body = Object.keys(groups).sort((a, b) => a === "Χωρίς περιοχή" ? 1 : b === "Χωρίς περιοχή" ? -1 : a.localeCompare(b)).map((a) => `<section class="section"><div class="section-head"><h2>${esc(a)}</h2><span class="muted small num">${groups[a].length}</span></div>
-      <div class="panel"><ul class="list">${groups[a].sort((x, y) => (x.name || "").localeCompare(y.name || "")).map((s) => shopRow(s)).join("")}</ul></div></section>`).join("");
+      <div class="panel"><ul class="list">${groups[a].sort((x, y) => (x.name || "").localeCompare(y.name || "")).map((s) => shopRow(s, "", null, true)).join("")}</ul></div></section>`).join("");
   return `${banner()}
-  <div class="search">${ic('<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>')}<input id="shop-search" type="search" placeholder="Αναζήτηση: όνομα, περιοχή, ιδιοκτήτης" value="${esc(state.query)}" data-action="search" aria-label="Αναζήτηση μαγαζιών"></div>
+  <div class="search">${ic('<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>')}<input id="shop-search" type="search" placeholder="Αναζήτηση: όνομα, επαφή, τηλέφωνο, προϊόν" value="${esc(state.query)}" data-action="search" aria-label="Αναζήτηση μαγαζιών"></div>
   <div class="scroller"><button class="chip" data-action="near" aria-pressed="${!!state.near}">📍 Κοντά μου</button>${chip("all", "Όλα")}${chip("active", "Πελάτες")}${chip("az", "ΑΖ")}${chip("competitor", "Ανταγωνισμός")}${chip("prospect", "Υποψήφιοι")}${chip("closed", "Έκλεισαν")}${chip("lost", "Χαμένοι")}</div>
   ${splitTotal ? `<div class="split panel"><div class="split-bar">${split.map(([k, n]) => n ? `<span class="${k}" style="flex:${n}"></span>` : "").join("")}</div><div class="split-legend">${split.map(([k, n]) => `<button data-action="filter" data-f="${k}"><i class="st-dot ${k}"></i>${STATUSES[k]} <b class="num">${n}</b> <span class="muted">${Math.round(n / splitTotal * 100)}%</span></button>`).join("")}</div></div>` : ""}
   <div class="scroller" role="group" aria-label="Περιοχές">${achip("all", "Όλες οι περιοχές", byStatus.length)}${Object.keys(areaCounts).sort().map((a) => achip(a, a, areaCounts[a])).join("")}</div>
@@ -893,7 +1062,7 @@ function viewCatalogue(c) {
 /* ---------- views: settings ---------- */
 function viewSettings() {
   const vchip = (k, l) => `<button class="chip" data-action="voice-lang" data-v="${k}" aria-pressed="${state.voiceLang === k}">${l}</button>`;
-  const profile = canEdit() ? `<section class="section"><h2>Προφίλ</h2><form class="panel inline-form" data-form="profile"><div class="grid2">${fld({ form: "profile", name: "myName", label: "Πώς να σε λέει ο Jarvis", value: state.settings.myName ?? "Σωκράτη" })}${fld({ form: "profile", name: "visitTarget", label: "Στόχος επισκέψεων τον μήνα", type: "number", value: state.settings.visitTarget || 40, attrs: 'min="1" inputmode="numeric"' })}</div><div class="row-actions"><button class="btn primary small" type="submit">Αποθήκευση</button></div></form></section>` : "";
+  const profile = canEdit() ? `<section class="section"><h2>Προφίλ</h2><form class="panel inline-form" data-form="profile"><div class="grid2">${fld({ form: "profile", name: "myName", label: "Πώς να σε λέει ο Jarvis", value: state.settings.myName ?? "Σωκράτη" })}${fld({ form: "profile", name: "visitTarget", label: "Στόχος επισκέψεων τον μήνα", type: "number", value: state.settings.visitTarget || 40, attrs: 'min="1" inputmode="numeric"' })}${fld({ form: "profile", name: "accountsTarget", label: "Στόχος νέων πελατών τον μήνα", type: "number", value: state.settings.accountsTarget || "", attrs: 'min="0" inputmode="numeric"' })}</div><div class="row-actions"><button class="btn primary small" type="submit">Αποθήκευση</button></div></form></section>` : "";
   const cal = canEdit() ? `<section class="section"><h2>Ημερολόγιο</h2><form class="panel inline-form" data-form="calendar">${fld({ form: "calendar", name: "icsUrl", label: "Ιδιωτική διεύθυνση iCal του Google Calendar", value: state.settings.icsUrl || "", ph: "https://calendar.google.com/calendar/ical/.../basic.ics" })}
     <p class="muted small">Στο Google Calendar (από υπολογιστή): Ρυθμίσεις → το ημερολόγιό σου → «Ενσωμάτωση ημερολογίου» → «Μυστική διεύθυνση σε μορφή iCal». Αντέγραψέ την εδώ και τα ραντεβού σου θα φαίνονται στην Ατζέντα. Μένει ιδιωτική στον λογαριασμό σου.</p>
     ${state.cal && state.cal.error ? `<p class="small" style="color:var(--bad)">${state.cal.error === "server_old" ? "Χρειάζεται η ενημερωμένη έκδοση του jarvis-ai στο Supabase." : calWhy(state.cal.why)}</p>` : state.cal && state.cal.url === state.settings.icsUrl ? `<p class="muted small">Συνδεδεμένο ✓ ${plural(state.cal.events.length, "ραντεβού", "ραντεβού")} τις επόμενες εβδομάδες.</p>` : ""}
@@ -933,12 +1102,26 @@ function gallery(photos, coll, docId) {
 }
 function photoThumb(s, pid) { return pid ? `<button class="thumb" data-action="lightbox-one" data-pid="${esc(pid)}" aria-label="Άνοιγμα φωτογραφίας"><img ${img(pid)} alt="" loading="lazy"></button>` : ""; }
 
+function profileCard(s) {
+  const c = mainContact(s), lv = visitsOf(s.id)[0], lo = lastOrder(s), na = nextActionOf(s);
+  const addr = [s.address, s.area, s.city].filter(Boolean).join(", ");
+  const cell = (label, body, cls = "") => `<div class="pc-cell ${cls}"><span class="eyebrow">${label}</span>${body}</div>`;
+  const none = (t, hint) => `<b class="muted">${t}</b>${hint ? `<small>${hint}</small>` : ""}`;
+  return `<section class="section"><div class="panel pcard">
+    ${cell("Επόμενη ενέργεια", na ? `<b>${esc(na.text)}</b><small>${na.date ? fmtDate(na.date) : "Χωρίς ημερομηνία"}</small>` : none("Καμία", "Όρισε επίσκεψη ή follow-up"), na && na.late ? "late" : "next")}
+    ${cell("Τελευταία επίσκεψη", lv ? `<b>${fmtDate(lv.date)} <span class="muted small">(πριν ${daysBetween(lv.date, todayISO())} μέρες)</span></b><small>${esc(clip(lv.notes, 120))}</small>` : s.lastVisit ? `<b>${fmtDate(s.lastVisit)}</b>` : none("Καμία ακόμα"))}
+    ${cell("Τελευταία παραγγελία", lo ? `<b>${fmtDate(lo.date)}</b><small>${esc(clip(orderText(lo), 120))}</small>` : none("Καμία", "Καταγράφεται με «Επίσκεψη» ή από τον Jarvis"))}
+    ${cell("Επαφή", c ? `<b>${esc(c.name || "Χωρίς όνομα")}${c.role ? ` <span class="muted small">${esc(c.role)}</span>` : ""}</b><small>${c.phone ? `<a href="${esc(telHref(c.phone))}" class="num">${esc(c.phone)}</a>` : ""}${c.phone && c.email ? " · " : ""}${c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : ""}</small>` : `<b class="muted">Καμία</b><small><button class="link small" data-action="shop-tab" data-v="contacts">Πρόσθεσε επαφή</button></small>`)}
+    ${cell("Τοποθεσία", addr || hasGeo(s) ? `<b>${esc(addr || "Σημείο GPS")}</b><small><a href="${mapsSearch(s)}" target="_blank" rel="noopener">Άνοιγμα στον χάρτη</a></small>` : none("Χωρίς διεύθυνση", "Πρόσθεσέ τη από την επεξεργασία"))}
+  </div></section>`;
+}
 function tabOverview(s) {
   const sc = scoreOf(s);
   const kv = [["Ιδιοκτήτης", esc(s.owner)], ["Περιοχή", esc([s.area, s.city].filter(Boolean).join(", "))], ["Διεύθυνση", esc(s.address)], ["GPS", hasGeo(s) ? `<span class="num">${s.lat.toFixed(5)}, ${s.lng.toFixed(5)}</span>` : ""], ["Επόμενη επίσκεψη", s.nextVisit ? `${fmtDate(s.nextVisit)} <a class="link small" href="${gcalLink("Επίσκεψη: " + s.name, s.nextVisit, [tr(s.type), s.owner].filter(Boolean).join(" · "), [s.address, s.area, s.city].filter(Boolean).join(", "))}" target="_blank" rel="noopener">+ Google Calendar</a>` : ""], ["Τελευταία επίσκεψη", s.lastVisit ? `${fmtDate(s.lastVisit)} (πριν ${daysSinceVisit(s)} μέρες)` : ""], ["Η επένδυσή μας", s.investAmount ? `<span class="num">${esc(money(s.investAmount))}</span>` : ""], ["Λεπτομέρειες επένδυσης", esc(s.investNotes)]]
     .filter(([, v]) => v).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
   const n = (a) => (s[a] || []).length;
-  return `<div class="stats"><div class="stat"><b>${n("assets")}</b><span>Εξοπλισμός</span></div><div class="stat"><b>${n("posm")}</b><span>POSM</span></div><div class="stat"><b>${n("backbar")}</b><span>Ετικέτες back bar</span></div><div class="stat"><b>${n("contacts")}</b><span>Επαφές</span></div></div>
+  return `${profileCard(s)}${oppsFor(s).length ? `<section class="section"><div class="section-head"><h2>Ευκαιρίες</h2><span class="muted small">τι λείπει εδώ</span></div><div class="panel"><ul class="list">${oppsFor(s).map((o) => `<li class="item opp"><span class="opp-ic ${o.kind}">${o.kind === "posm" ? ICON.star : ICON.plus}</span><div class="grow"><div class="title">${esc(o.text)}</div><div class="sub">${esc(o.why)}</div></div></li>`).join("")}</ul></div></section>` : ""}
+  <div class="stats"><div class="stat"><b>${n("assets")}</b><span>Εξοπλισμός</span></div><div class="stat"><b>${n("posm")}</b><span>POSM</span></div><div class="stat"><b>${n("backbar")}</b><span>Ετικέτες back bar</span></div><div class="stat"><b>${n("contacts")}</b><span>Επαφές</span></div></div>
   <section class="section"><h2>Στοιχεία</h2><div class="panel">${kv ? `<dl class="kv">${kv}</dl>` : `<div class="empty">Δεν υπάρχουν στοιχεία ακόμα.</div>`}</div></section>
   <section class="section"><h2>Εσωτερική πληροφόρηση</h2><div class="panel">${s.insideInfo ? `<div class="prose">${esc(s.insideInfo)}</div>` : `<div class="empty">Τίποτα ακόμα. Συμφωνίες ανταγωνιστών, σχέδια ιδιοκτήτη, ποιος αποφασίζει πραγματικά.</div>`}</div></section>
   ${s.status === "prospect" ? `<section class="section"><div class="section-head"><h2>Αξιολόγηση υποψηφίου</h2><span class="num">${sc == null ? "–" : sc}/100</span></div><div class="panel">${CRITERIA.map(([k, l]) => { const v = Number((s.scores || {})[k]) || 0; return `<div class="crit"><span>${l}</span><span class="num">${v}/5</span><div class="scorebar" style="grid-column:1/-1">${[1, 2, 3, 4, 5].map((i) => `<span class="${i <= v ? "on" : ""}"></span>`).join("")}</div></div>`; }).join("")}</div></section>` : ""}
@@ -1016,7 +1199,7 @@ function tabConsumption(s) {
   const unit = entries[0] ? entries[0].unit : "";
   const months = [...new Set(entries.map((e) => e.month))].sort();
   let trend = "";
-  if (months.length >= 2) { const sum = (m) => entries.filter((e) => e.month === m).reduce((t, e) => t + (Number(e.qty) || 0), 0); const a = sum(months[months.length - 2]), b = sum(months[months.length - 1]); if (a) { const d = (b - a) / a * 100; trend = `<span class="pill" style="color:${d >= 0 ? "var(--good)" : "var(--bad)"}">${d >= 0 ? "▲" : "▼"} ${Math.abs(d).toFixed(0)}% σε σχέση με τον προηγούμενο μήνα</span>`; } }
+  if (months.length >= 2) { const sum = (m) => entries.filter((e) => e.month === m).reduce((t, e) => t + (Number(e.qty) || 0), 0); const a = sum(months[months.length - 2]), b = sum(months[months.length - 1]); if (a) { const d = (b - a) / a * 100; trend = `<span class="pill" style="color:${d >= 0 ? "var(--good)" : "var(--bad)"}">${arrow(d >= 0)} ${Math.abs(d).toFixed(0)}% σε σχέση με τον προηγούμενο μήνα</span>`; } }
   return `<p class="muted small">Μηνιαίοι όγκοι ανά προϊόν, για να βλέπεις αν το μαγαζί ανεβαίνει ή πέφτει.</p>
   ${products.length ? `<div class="scroller">${products.map((p) => `<button class="chip" data-action="cons-product" data-v="${esc(p)}" aria-pressed="${p === cur}">${esc(p)}</button>`).join("")}</div>
   <section class="section"><div class="section-head"><h2>${esc(cur)}${unit ? ` <span class="muted small">(${esc(unit)})</span>` : ""}</h2>${trend}</div><div class="panel">${consChart(entries)}</div></section>
@@ -1031,13 +1214,15 @@ function tabContacts(s) {
   ${adder(`contact:${s.id}`, "Νέα επαφή", [{ name: "name", label: "Όνομα", required: true }, { name: "role", label: "Ρόλος", ph: "Ιδιοκτήτης, υπεύθυνος, bartender" }, { name: "phone", label: "Τηλέφωνο", type: "tel" }, { name: "email", label: "Email", type: "email" }, { name: "notes", label: "Σημειώσεις", ph: "Καλύτερη ώρα για τηλέφωνο, γενέθλια, προτιμήσεις" }], "Αποθήκευση")}`;
 }
 
+const visitItem = (v) => `<li class="item"><div class="grow"><div class="sub num">${fmtDate(v.date)}${v.outcome ? ` · <span class="outcome ${esc(v.outcome)}">${esc(lbl(OUTCOMES, v.outcome))}</span>` : ""}${v.potential ? ` · Δυναμική: ${esc(lbl(POTENTIAL, v.potential))}` : ""}</div><div style="white-space:pre-wrap">${esc(v.notes)}</div>${(v.discussed || []).length ? `<div class="sub">Συζητήσαμε: ${esc(v.discussed.join(", "))}</div>` : ""}${(v.order || []).length ? `<div class="sub">Παραγγελία: ${esc(orderText({ items: v.order }))}</div>` : ""}${v.competition ? `<div class="sub">Ανταγωνισμός: ${esc(v.competition)}</div>` : ""}</div></li>`;
 function tabVisits(s) {
-  const visits = state.visits.filter((v) => v.shopId === s.id);
+  const visits = visitsOf(s.id);
   const tasks = state.tasks.filter((t) => t.shopId === s.id && !t.done);
   return `<section class="section"><h2>Ανοιχτές εργασίες</h2><div class="panel"><ul class="list">${tasks.length ? tasks.map(taskRow).join("") : `<li class="empty">Δεν υπάρχουν ανοιχτές εργασίες για αυτό το μαγαζί.</li>`}</ul></div>${taskForm(s.id)}</section>
   <section class="section"><h2>Ιστορικό επισκέψεων</h2>
-  ${adder(`visit:${s.id}`, "Καταγραφή επίσκεψης", [{ name: "date", label: "Ημερομηνία", type: "date", required: true, value: todayISO() }, { name: "notes", label: "Τι έγινε", type: "textarea", required: true, ph: "Ποιον είδες, παραγγελίες, POSM, παράπονα, επόμενα βήματα" }], "Αποθήκευση")}
-  <div class="panel">${visits.length ? `<ul class="list">${visits.map((v) => `<li class="item"><div class="grow"><div class="sub num">${fmtDate(v.date)}</div><div style="white-space:pre-wrap">${esc(v.notes)}</div></div></li>`).join("")}</ul>` : `<div class="empty">Δεν έχουν καταγραφεί επισκέψεις ακόμα.</div>`}</div></section>`;
+  ${canEdit() ? `<div class="row-actions"><button class="btn primary" data-action="log-visit" data-id="${esc(s.id)}">${ICON.done} Καταγραφή επίσκεψης</button></div>` : ""}
+  <div class="panel">${visits.length ? `<ul class="list">${visits.map(visitItem).join("")}</ul>` : `<div class="empty">Δεν έχουν καταγραφεί επισκέψεις ακόμα.</div>`}</div></section>
+  ${(s.orders || []).length ? `<section class="section"><h2>Παραγγελίες</h2><div class="panel"><ul class="list">${(s.orders || []).map((o, i) => ({ o, i })).sort((a, b) => (b.o.date || "").localeCompare(a.o.date || "")).map(({ o, i }) => `<li class="item"><div class="grow"><div class="sub num">${fmtDate(o.date)}</div><div>${esc(orderText(o))}</div></div>${rmButton(`shop:${s.id}:orders:${i}`)}</li>`).join("")}</ul></div></section>` : ""}`;
 }
 
 function viewShop(s) {
@@ -1054,8 +1239,8 @@ function viewShop(s) {
   <div class="actions4">
     <a class="act" href="${mapsDir(s)}" target="_blank" rel="noopener"><span class="act-ic">${ICON.nav}</span>Οδηγίες</a>
     ${phone ? `<a class="act" href="tel:${esc(phone.replace(/\s/g, ""))}"><span class="act-ic">${ICON.phone}</span>Κλήση</a>` : `<button class="act" data-action="shop-tab" data-v="contacts"><span class="act-ic">${ICON.phone}</span>Επαφές</button>`}
-    <button class="act" data-action="talk"><span class="act-ic">${ICON.mic}</span>Αναφορά</button>
-    <button class="act" data-action="shop-tab" data-v="photos"><span class="act-ic">${ICON.camera}</span>Φωτογραφίες</button>
+    ${canEdit() && s.id ? `<button class="act" data-action="log-visit" data-id="${esc(s.id)}"><span class="act-ic">${ICON.done}</span>Επίσκεψη</button>` : `<button class="act" data-action="shop-tab" data-v="photos"><span class="act-ic">${ICON.camera}</span>Φωτογραφίες</button>`}
+    <button class="act" data-action="talk"><span class="act-ic">${ICON.mic}</span>Jarvis</button>
   </div>
   <div class="tabbar" role="tablist" aria-label="Ενότητες μαγαζιού">${SHOP_TABS.map(([k, l]) => `<button class="tab" role="tab" data-action="shop-tab" data-v="${k}" aria-selected="${state.shopTab === k}">${l}</button>`).join("")}</div>
   ${tabs[state.shopTab](s)}`;
@@ -1144,7 +1329,7 @@ function render() {
     html = c ? viewCatalogue(c) : `<button class="back" data-action="back">← Πίσω</button><p class="muted">Αυτός ο κατάλογος διαγράφηκε.</p>`;
   } else {
     if (state.view === "market" || state.view === "catalogues") state.marketSeg = state.view === "market" ? "share" : "catalogues";
-    html = { today: viewToday, shops: viewShops, agenda: viewAgenda, more: viewMore, map: viewMap, prospects: viewProspects, market: viewMarket, catalogues: viewMarket, tasks: viewTasks, settings: viewSettings, route: viewRoute, report: viewReport, alerts: viewAlerts, files: viewFiles, watch: viewWatch }[state.view]();
+    html = { today: viewToday, shops: viewShops, agenda: viewAgenda, more: viewMore, map: viewMap, prospects: viewProspects, market: viewMarket, catalogues: viewMarket, tasks: viewTasks, settings: viewSettings, route: viewRoute, report: viewReport, alerts: viewAlerts, files: viewFiles, watch: viewWatch, sales: viewSales }[state.view]();
   }
   const openAdders = [...app.querySelectorAll("details.adder[open] form")].map((f) => f.dataset.form);
   app.innerHTML = html + datalists();
@@ -1254,9 +1439,17 @@ async function onAction(ev) {
   }
   else if (a === "go") { ev.preventDefault(); nav(el.dataset.v); }
   else if (a === "talk") openTalk();
-  else if (a === "route-toggle") { const ids = (state.route || { ids: [] }).ids; state.route = { ids: ids.includes(el.dataset.id) ? ids.filter((x) => x !== el.dataset.id) : [...ids, el.dataset.id] }; render(); }
+  else if (a === "route-toggle") { const R = routeState(), id = el.dataset.id; R.ids = R.ids.includes(id) ? R.ids.filter((x) => x !== id) : [...R.ids, id]; saveRoute(); render(); }
+  else if (a === "route-move") { const R = routeState(); const cur = [...app.querySelectorAll(".stops [data-action='route-move'][data-v='1']")].map((b) => b.dataset.id); const i = cur.indexOf(el.dataset.id), j = i + Number(el.dataset.v); if (i < 0 || j < 0 || j >= cur.length) return; [cur[i], cur[j]] = [cur[j], cur[i]]; R.ids = cur; R.manual = true; saveRoute(); render(); }
+  else if (a === "route-auto") { routeState().manual = false; saveRoute(); render(); }
+  else if (a === "route-all") { routeState().all = el.dataset.v === "1"; saveRoute(); render(); }
+  else if (a === "route-area") { const R = routeState(), t = todayISO(), pri = new Set(priorities().map((p) => p.s.id)); state.shops.filter((s) => areaOf(s) === el.dataset.v && !R.ids.includes(s.id) && s.status !== "closed" && s.status !== "lost" && (R.all || pri.has(s.id) || s.nextVisit === t)).forEach((s) => R.ids.push(s.id)); saveRoute(); render(); }
+  else if (a === "start-day") startDay();
+  else if (a === "sales-month") { state.salesMonth = Number(el.dataset.v); render(); }
+  else if (a === "target-rm") { const targets = (state.settings.targets || []).filter((_, i) => i !== Number(el.dataset.v)); await guarded(() => state.db.doc("meta/settings").set({ ...state.settings, targets })); }
+  else if (a === "log-visit") { ev.preventDefault(); openLog(el.dataset.id); }
   else if (a === "route-locate") { el.classList.add("busy"); locate().then(render).catch(() => { el.classList.remove("busy"); alert("Η τοποθεσία είναι κλειδωμένη. Επέτρεψέ την για την εφαρμογή στις ρυθμίσεις του κινητού."); }); }
-  else if (a === "route-plan") { const t = todayISO(); await guarded(async () => { for (const id of state.route.ids) { const s = shopById(id); if (s && s.nextVisit !== t) await state.db.doc("shops/" + id).update({ nextVisit: t }); } }); el.textContent = "Μπήκαν στο πρόγραμμα ✓"; }
+  else if (a === "route-plan") { const t = todayISO(); await guarded(async () => { for (const id of routeState().ids) { const s = shopById(id); if (s && s.nextVisit !== t) await state.db.doc("shops/" + id).update({ nextVisit: t }); } }); el.textContent = "Μπήκαν στο πρόγραμμα ✓"; }
   else if (a === "report-week") { state.reportWeek = Number(el.dataset.v); state.reportErr = ""; render(); }
   else if (a === "report-ai") reportAi();
   else if (a === "file-save") fileSave();
@@ -1407,11 +1600,14 @@ app.addEventListener("submit", async (ev) => {
   } else if (kind === "cat-item") {
     await pushTo("catalogues", state.catId, "items", { brand: v("brand"), product: v("product"), category: v("category"), size: v("size"), price: v("price") });
   } else if (kind === "profile") {
-    await guarded(() => state.db.doc("meta/settings").set({ ...state.settings, myName: v("myName"), visitTarget: Number(v("visitTarget")) || 40 }));
+    await guarded(() => state.db.doc("meta/settings").set({ ...state.settings, myName: v("myName"), visitTarget: Number(v("visitTarget")) || 40, accountsTarget: Number(v("accountsTarget")) || 0 }));
   } else if (kind === "calendar") {
     const icsUrl = cleanIcs(v("icsUrl"));
     await guarded(() => state.db.doc("meta/settings").set({ ...state.settings, icsUrl }));
     state.settings.icsUrl = icsUrl; loadCalendar(true);
+  } else if (kind === "target") {
+    const targets = [...(state.settings.targets || []).filter((x) => norm(x.product) !== norm(v("product"))), { product: v("product"), qty: Number(v("qty").replace(",", ".")) || 0, unit: v("unit") }];
+    await guarded(() => state.db.doc("meta/settings").set({ ...state.settings, targets }));
   } else if (kind === "settings") {
     await guarded(() => state.db.doc("meta/settings").set({ ...state.settings, myCompany: v("myCompany") }));
   }
@@ -1420,14 +1616,152 @@ app.addEventListener("submit", async (ev) => {
 });
 
 
+/* ---------- one-tap visit completion ---------- */
+const OUTCOMES = [["", "Διάλεξε"], ["positive", "Θετική"], ["neutral", "Ουδέτερη"], ["negative", "Αρνητική"], ["absent", "Δεν βρήκα τον υπεύθυνο"]];
+const POTENTIAL = [["", "Δεν συζητήθηκε"], ["none", "Καμία"], ["low", "Χαμηλή"], ["medium", "Μέτρια"], ["high", "Υψηλή"]];
+const lbl = (list, k) => (list.find((x) => x[0] === k) || [, ""])[1];
+const logRoot = document.createElement("div"); document.body.appendChild(logRoot);
+function openLog(id) { if (!shopById(id) || !canEdit()) return; state.log = { id, lines: 1 }; renderLog(); }
+function closeLog() { if (rec && state.log && state.log.listening) rec.stop(); state.log = null; renderLog(); }
+const orderLine = (i, v = {}) => `<div class="oline">${fld({ form: "log", name: "p" + i, label: "Προϊόν", list: "dl-products", value: v.product || "" })}${fld({ form: "log", name: "q" + i, label: "Ποσότητα", type: "number", value: v.qty ?? "", attrs: 'min="0" step="any" inputmode="decimal"' })}${fld({ form: "log", name: "u" + i, label: "Μονάδα", value: v.unit || "", ph: "κιβώτια" })}</div>`;
+function renderLog() {
+  const L = state.log, s = L && shopById(L.id);
+  if (!s) { logRoot.innerHTML = ""; return; }
+  const t = todayISO();
+  const f = (name, label, type = "text", extra = {}) => fld({ form: "log", name, label, type, ...extra });
+  logRoot.innerHTML = `<div class="sheet-bg" data-log="bg"><form class="sheet log-sheet" data-form="log" role="dialog" aria-label="Ολοκλήρωση επίσκεψης" novalidate>
+    <div class="section-head"><h2>Ολοκλήρωση επίσκεψης</h2><span class="muted small">${esc(s.name)}</span></div>
+    <div class="panel voice-fill"><div class="inline-form">
+      <label class="field" for="log-say">Πες ή γράψε τι έγινε και ο Jarvis συμπληρώνει τα πεδία. Τα ελέγχεις πριν την αποθήκευση.</label>
+      <textarea id="log-say" rows="3" placeholder="π.χ. Είδα τον Νίκο. Μιλήσαμε για Mythos και Fix. Παρήγγειλε 10 κιβώτια Fix. Ο ανταγωνισμός του έφερε νέο ψυγείο. Να του πάω τιμοκατάλογο την Παρασκευή."></textarea>
+      <div class="row-actions">${Rec ? `<button type="button" class="btn small ${L.listening ? "danger" : ""}" data-log="mic">${ICON.mic} ${L.listening ? "Σε ακούω… πάτα για τέλος" : "Μίλα"}</button>` : ""}<button type="button" class="btn small primary" data-log="fill" ${L.busy ? "disabled" : ""}>${L.busy ? "Ο Jarvis συμπληρώνει…" : "✨ Συμπλήρωση πεδίων"}</button></div>
+      ${L.msg ? `<p class="small ${L.msgOk ? "ok-text" : "bad-text"}" role="status">${esc(L.msg)}</p>` : ""}
+    </div></div>
+    <div class="grid2">${f("date", "Ημερομηνία", "date", { value: t, required: true })}${f("outcome", "Αποτέλεσμα", "select", { options: OUTCOMES })}</div>
+    ${f("discussed", "Προϊόντα που συζητήσαμε", "text", { ph: "χωρισμένα με κόμμα", list: "dl-products" })}
+    <fieldset class="order-lines"><legend>Παραγγελία</legend><div id="log-lines">${Array.from({ length: L.lines }, (_, i) => orderLine(i)).join("")}</div><button type="button" class="btn small" data-log="line">+ Προϊόν</button></fieldset>
+    <div class="grid2">${f("potential", "Δυναμική παραγγελίας", "select", { options: POTENTIAL })}${f("nextVisit", "Επόμενη επίσκεψη", "date", { value: s.nextVisit && s.nextVisit > t ? s.nextVisit : "" })}</div>
+    ${f("competition", "Δραστηριότητα ανταγωνισμού", "text", { ph: "π.χ. νέο ψυγείο, προσφορά 5+1, άλλαξαν brand στη βρύση" })}
+    ${f("notes", "Σημειώσεις", "textarea", { ph: "Ποιον είδες, τι ειπώθηκε, τι υποσχέθηκες" })}
+    <div class="grid2">${f("task", "Επόμενο follow-up", "text", { ph: "π.χ. Φέρε τιμοκατάλογο" })}${f("taskDue", "Μέχρι", "date")}</div>
+    ${L.error ? `<div class="banner" role="alert">${esc(L.error)}</div>` : ""}
+    <div class="row-actions sticky-actions"><button class="btn primary" type="submit">Αποθήκευση επίσκεψης</button><button class="btn" type="button" data-log="close">Ακύρωση</button></div>
+  </form></div>${datalists()}`;
+}
+function logValues(form) {
+  const fd = new FormData(form), v = (k) => String(fd.get(k) ?? "").trim();
+  const items = [];
+  for (let i = 0; fd.has("p" + i); i++) { const p = v("p" + i), q = Number(v("q" + i).replace(",", ".")); if (p && q > 0) items.push({ product: p, qty: q, unit: v("u" + i) }); }
+  return { date: isDate(v("date")) ? v("date") : todayISO(), outcome: v("outcome"), discussed: v("discussed").split(/[,;]/).map((x) => x.trim()).filter(Boolean), items, potential: v("potential"), nextVisit: isDate(v("nextVisit")) ? v("nextVisit") : "", competition: v("competition"), notes: v("notes"), task: v("task") ? { title: v("task"), due: isDate(v("taskDue")) ? v("taskDue") : "" } : null };
+}
+function addOrder(s, patch, date, items, source) {
+  const clean = (items || []).filter((i) => i && i.product && Number(i.qty) > 0).map((i) => ({ product: String(i.product).trim(), qty: Number(i.qty), unit: i.unit || "" }));
+  if (!clean.length) return;
+  patch.orders = [...(patch.orders || s.orders || []), { date, items: clean, source }];
+  patch.consumption = [...(patch.consumption || s.consumption || []), ...clean.map((i) => ({ month: date.slice(0, 7), product: i.product, qty: i.qty, unit: i.unit, source: "order" }))];
+}
+async function saveVisit(s, x, stamp, source) {
+  const notes = x.notes || [x.items.length ? "Παραγγελία: " + orderText({ items: x.items }) : "", x.discussed.length ? "Συζητήσαμε: " + x.discussed.join(", ") : ""].filter(Boolean).join(". ") || "Επίσκεψη";
+  const visit = { shopId: s.id, date: x.date, notes, createdAt: stamp, source };
+  if (x.outcome) visit.outcome = x.outcome;
+  if (x.discussed.length) visit.discussed = x.discussed;
+  if (x.potential) visit.potential = x.potential;
+  if (x.competition) visit.competition = x.competition;
+  if (x.items.length) visit.order = x.items;
+  await state.db.collection("visits").doc().set(visit);
+  const patch = { updatedAt: stamp };
+  if (!s.lastVisit || x.date > s.lastVisit) patch.lastVisit = x.date;
+  if (x.nextVisit) patch.nextVisit = x.nextVisit;
+  if (x.competition) patch.insideInfo = [s.insideInfo, `${x.date}: Ανταγωνισμός: ${x.competition}`].filter(Boolean).join("\n");
+  addOrder(s, patch, x.date, x.items, source);
+  await state.db.doc("shops/" + s.id).update(patch);
+  if (x.task) await state.db.collection("tasks").doc().set({ title: x.task.title, due: x.task.due, shopId: s.id, done: false, createdAt: stamp });
+}
+async function logFill() {
+  const L = state.log, s = shopById(L.id), say = document.getElementById("log-say"), text = say ? say.value.trim() : "";
+  if (!text) { L.msg = "Πες ή γράψε πρώτα τι έγινε."; L.msgOk = false; renderLog(); return; }
+  if (!state.sample) { L.msg = "Ο Jarvis δεν είναι διαθέσιμος τώρα. Συμπλήρωσε τα πεδία με το χέρι."; L.msgOk = false; renderLog(); return; }
+  const keep = logValues(logRoot.querySelector("form")), keepFd = new FormData(logRoot.querySelector("form"));
+  const redraw = () => { renderLog(); restoreForm(keepFd); document.getElementById("log-say").value = text; };
+  L.busy = true; L.msg = ""; L.say = text; redraw();
+  const prompt = `A HoReCa sales rep in Greece just finished a visit at "${s.name}" (${tr(s.type) || ""}, ${s.area || ""}) and dictated what happened (expect typos and loose phrasing). Today is ${todayISO()}. Known products: ${JSON.stringify([...new Set(state.shops.flatMap((x) => (x.consumption || []).map((c) => c.product).concat((x.products || []).map((p) => p.name))).concat(state.catalogues.flatMap((c) => (c.items || []).map((i) => i.brand))).filter(Boolean))].slice(0, 200))}.
+Return only this JSON (omit what was not said; never invent):
+{"outcome":"positive|neutral|negative|absent","discussed":["product names"],"order":[{"product":"","qty":0,"unit":""}],"potential":"none|low|medium|high","competition":"what the competition is doing there","notes":"clean summary in Greek","nextVisit":"YYYY-MM-DD","task":{"title":"short follow-up in Greek","due":"YYYY-MM-DD"}}
+Resolve relative dates against today. "order" is only what the shop actually ordered now.
+The rep said:
+"""${text}"""`;
+  try {
+    const r = await state.sample.json(prompt, { cache: false });
+    L.busy = false; L.msg = "Συμπληρώθηκε. Έλεγξε τα πεδία και πάτα Αποθήκευση."; L.msgOk = true;
+    const order = (Array.isArray(r.order) ? r.order : []).filter((o) => o && o.product);
+    L.lines = Math.max(L.lines, [...keepFd.keys()].filter((k) => /^p\d+$/.test(k) && keepFd.get(k)).length + order.length); redraw();
+    const set = (n, v) => { const el = logRoot.querySelector(`[name="${n}"]`); if (el && v != null && v !== "") el.value = v; };
+    set("outcome", OUTCOMES.some((o) => o[0] === r.outcome) ? r.outcome : keep.outcome);
+    set("discussed", [...new Set([...keep.discussed, ...(Array.isArray(r.discussed) ? r.discussed : [])])].join(", "));
+    const free = Array.from({ length: L.lines }, (_, i) => i).filter((i) => !logRoot.querySelector(`[name="p${i}"]`).value);
+    order.forEach((o, k) => { const i = free[k]; if (i == null) return; set("p" + i, o.product); set("q" + i, Number(o.qty) || ""); set("u" + i, o.unit || ""); });
+    set("potential", POTENTIAL.some((o) => o[0] === r.potential) ? r.potential : keep.potential);
+    set("competition", r.competition || keep.competition);
+    set("notes", [keep.notes, r.notes].filter(Boolean).join("\n"));
+    set("nextVisit", isDate(r.nextVisit) ? r.nextVisit : keep.nextVisit);
+    if (r.task && r.task.title) { set("task", r.task.title); set("taskDue", isDate(r.task.due) ? r.task.due : ""); }
+  } catch (e) { L.busy = false; L.msg = sampleErr(e) + " Μπορείς να συμπληρώσεις τα πεδία με το χέρι."; L.msgOk = false; redraw(); }
+}
+function logMic() {
+  const L = state.log;
+  if (L.listening) { rec && rec.stop(); return; }
+  const box = document.getElementById("log-say"); const base = box ? box.value.trim() : "";
+  try { rec = new Rec(); } catch { L.msg = MIC_ERRORS["service-not-allowed"]; L.msgOk = false; renderLog(); return; }
+  rec.lang = state.voiceLang; rec.continuous = true; rec.interimResults = true;
+  let finalText = "";
+  rec.onresult = (e) => { let interim = ""; for (let i = e.resultIndex; i < e.results.length; i++) { if (e.results[i].isFinal) finalText += e.results[i][0].transcript + " "; else interim += e.results[i][0].transcript; } const b = document.getElementById("log-say"); if (b) b.value = [base, finalText + interim].filter(Boolean).join(" ").trim(); };
+  rec.onerror = (e) => { L.msg = MIC_ERRORS[e.error] || MIC_ERRORS["service-not-allowed"]; L.msgOk = false; };
+  rec.onend = () => { const b = document.getElementById("log-say"), v = b ? b.value : ""; L.listening = false; const form = logRoot.querySelector("form"); const keep = form ? new FormData(form) : null; renderLog(); restoreForm(keep); const nb = document.getElementById("log-say"); if (nb) nb.value = v; };
+  L.listening = true; L.msg = ""; const form = logRoot.querySelector("form"); const keep = form ? new FormData(form) : null; renderLog(); restoreForm(keep); document.getElementById("log-say").value = base;
+  try { rec.start(); } catch { L.listening = false; L.msg = MIC_ERRORS["service-not-allowed"]; renderLog(); }
+}
+function restoreForm(fd) { if (!fd) return; for (const [k, v] of fd.entries()) { const el = logRoot.querySelector(`[name="${k}"]`); if (el && typeof v === "string") el.value = v; } }
+logRoot.addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-log]");
+  if (!b) return;
+  const a = b.dataset.log;
+  if (a === "bg") { if (ev.target === b && !state.log.busy) closeLog(); return; }
+  if (a === "close") closeLog();
+  else if (a === "line") { const box = document.getElementById("log-lines"); box.insertAdjacentHTML("beforeend", orderLine(box.children.length)); state.log.lines = box.children.length; }
+  else if (a === "fill") logFill();
+  else if (a === "mic") logMic();
+});
+logRoot.addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const form = ev.target, L = state.log, s = shopById(L.id), x = logValues(form);
+  const btn = form.querySelector('[type="submit"]'); btn.disabled = true; btn.textContent = "Αποθήκευση…";
+  const ok = await guarded(() => saveVisit(s, x, new Date().toISOString(), L.say ? "voice" : "manual"));
+  if (ok) { state.log = null; renderLog(); toast(`Η επίσκεψη στο ${s.name} αποθηκεύτηκε${x.items.length ? " με παραγγελία" : ""}${x.task ? " και follow-up" : ""} ✓`); settle(); }
+  else { L.error = "Δεν αποθηκεύτηκε. Έλεγξε τη σύνδεση και δοκίμασε ξανά. Τα στοιχεία σου είναι ακόμα εδώ."; btn.disabled = false; btn.textContent = "Αποθήκευση επίσκεψης"; const err = document.createElement("div"); err.className = "banner"; err.setAttribute("role", "alert"); err.textContent = L.error; btn.parentElement.before(err); }
+});
+let toastTimer = null;
+function toast(msg) {
+  let el = document.getElementById("toast");
+  if (!el) { el = document.createElement("div"); el.id = "toast"; el.className = "toast"; el.setAttribute("role", "status"); document.body.appendChild(el); }
+  el.textContent = msg; el.classList.add("on");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove("on"), 3200);
+}
+
 /* ---------- Talk to Jarvis ---------- */
 const talkRoot = document.getElementById("talk-root");
 let talkCtl = null;
-function digest(full) {
+/* Everything Jarvis may answer from. Records carry ids (v: visit, t: task, o: order, s: shop) so answers can cite them. */
+function digest(full, curId = null) {
   return state.shops.map((s) => {
-    const d = { id: s.id, name: s.name, area: s.area || "", status: s.status, type: s.type || "" };
+    const d = { id: "s:" + s.id, name: s.name, area: s.area || "", status: s.status, type: s.type || "" };
     if (hasGeo(s)) { d.lat = +s.lat.toFixed(5); d.lng = +s.lng.toFixed(5); }
-    if (full) Object.assign(d, { owner: s.owner || "", lastVisit: s.lastVisit || "", nextVisit: s.nextVisit || "", investAmount: s.investAmount || "", score: scoreOf(s), contacts: (s.contacts || []).map((c) => c.name + (c.role ? ` (${c.role})` : "") + (c.phone ? " " + c.phone : "")), assets: (s.assets || []).map((a) => `${a.type} ${a.brand || ""} S/N ${a.serial || "-"} x${a.qty || 1}`), posm: (s.posm || []).map((p) => `${p.type} ${p.brand || ""} x${p.qty || 1}`), backbar: (s.backbar || []).map((b) => `${b.brand} (${b.company || "?"}) x${b.facings || 1}`), products: (s.products || []).map((p) => `${p.name} ${p.price || ""}`), consumption: (s.consumption || []).slice(-24), insideInfo: s.insideInfo || "" });
+    if (full) {
+      const mine = s.id === curId;
+      Object.assign(d, { owner: s.owner || "", address: s.address || "", lastVisit: s.lastVisit || "", nextVisit: s.nextVisit || "", investAmount: s.investAmount || "", score: scoreOf(s), contacts: (s.contacts || []).map((c) => [c.name, c.role && `(${c.role})`, c.phone, c.email].filter(Boolean).join(" ")), assets: (s.assets || []).map((a) => `${a.type} ${a.brand || ""} S/N ${a.serial || "-"} x${a.qty || 1}${a.notes ? " " + a.notes : ""}`), posm: (s.posm || []).map((p) => `${p.type} ${p.brand || ""} x${p.qty || 1}${p.notes ? " " + p.notes : ""}`), backbar: (s.backbar || []).map((b) => `${b.brand} (${b.company || "?"}) x${b.facings || 1}`), products: (s.products || []).map((p) => `${p.name} ${p.price || ""}`), consumption: (s.consumption || []).slice(-24).map((c) => `${c.month} ${c.product} ${c.qty} ${c.unit || ""}`), insideInfo: clip(s.insideInfo, mine ? 2000 : 500), pricingNotes: clip(s.pricingNotes, 300),
+        visits: visitsOf(s.id).slice(0, mine ? 12 : 3).map((v) => ({ id: "v:" + v.id, date: v.date, notes: clip(v.notes, mine ? 900 : 260), outcome: v.outcome || undefined, competition: v.competition || undefined })),
+        orders: (s.orders || []).map((o, i) => ({ id: `o:${s.id}:${i}`, date: o.date, items: orderText(o) })).slice(-6),
+        missing: oppsFor(s).map((o) => o.text) });
+    }
     return d;
   });
 }
@@ -1435,7 +1769,8 @@ function talkPrompt(text) {
   const cur = state.shopId && state.shopId !== "new" ? shopById(state.shopId) : null;
   const companies = [...new Set(state.catalogues.map((c) => c.company))];
   const brandMap = Object.entries(brandIndex()).slice(0, 400).map(([b, v]) => `${b} = ${v.company}`).join("; ");
-  const openTasks = state.tasks.filter((t) => !t.done).map((t) => ({ title: t.title, due: t.due, shop: (shopById(t.shopId) || {}).name || "" }));
+  const openTasks = state.tasks.filter((t) => !t.done).map((t) => ({ id: "t:" + t.id, title: t.title, due: t.due, shop: (shopById(t.shopId) || {}).name || "", shopId: t.shopId ? "s:" + t.shopId : "" }));
+  const hist = (state.talk && state.talk.history || []).map((h) => `Rep: ${h.q}\nJarvis: ${h.a}`).join("\n\n");
   return `You are Jarvis, the field assistant of a HoReCa sales rep in Greece who visits cafés, bars, restaurants and hotels. The rep just spoke (dictated, so expect typos, Greek names in Latin or Greek letters, and loose phrasing). Today is ${todayISO()}.
 ${state.here && Date.now() - state.here.at < 10 * 60000 ? `The rep's phone GPS says they are at ${state.here.lat.toFixed(5)}, ${state.here.lng.toFixed(5)}. Shops with lat/lng nearby (under ~80 m) are likely the one they mean if they don't name it.` : ""}
 ${cur ? `The rep currently has this shop open, so assume they mean it unless they name another: ${cur.name} (id ${cur.id}).` : ""}
@@ -1443,21 +1778,28 @@ ${cur ? `The rep currently has this shop open, so assume they mean it unless the
 Decide whether the rep is REPORTING information to save, or ASKING a question about their data.
 
 Shop status meanings: active = our customer, az = an ΑΖ shop, competitor = a shop that works with the competition, prospect = possible new customer, closed / lost.
-Known shops (full data):
-${JSON.stringify(digest(true))}
+Known shops (full data; "missing" = products or POSM most of the rep's customers have but this shop lacks):
+${JSON.stringify(digest(true, cur && cur.id))}
 Open tasks: ${JSON.stringify(openTasks)}
 Company catalogues: ${JSON.stringify(companies)}
+The rep's own company: ${state.settings.myCompany || "not set"}
+${hist ? `Earlier in this conversation:
+${hist}
+` : ""}
 Known brand to company: ${brandMap || "none yet"}
 
 Reply with only one JSON object of this shape (omit empty fields):
 {
  "kind": "update" or "answer",
- "answer": "for questions: a short, direct spoken-style answer using the data above",
+ "answer": "for questions and requests for help: a clear answer in Greek using ONLY the records above. If the records don't contain it, say so plainly. For a visit preparation use short labelled lines: Ποιον θα δεις, Τι έγινε τελευταία, Τι παίρνουν / τελευταία παραγγελία, Ανοιχτά θέματα, Τι λείπει (ευκαιρίες), Τι να πεις. Line breaks allowed; no markdown except '-' bullets.",
+ "sources": ["ids of the exact records the answer relies on, e.g. v:..., t:..., o:..., s:..."],
+ "actions": [{"type":"task","shopId":"s:...","title":"","due":"YYYY-MM-DD"},{"type":"nextVisit","shopId":"s:...","date":"YYYY-MM-DD"},{"type":"note","shopId":"s:...","text":""}] (optional, with "answer" only: concrete follow-ups the rep can approve; at most 6),
  "summary": "for updates: one sentence describing what you will save",
  "shopId": "id of the existing shop this is about, or null",
  "newShop": {"name":"","type":"Restaurant|Café|Bar|Cocktail bar|Hotel|Beach bar|Club|Taverna|Kiosk / mini market|Catering|Other","area":"","city":"Athens","address":"","status":"active|az|competitor|prospect|closed|lost"} or null (only when no existing shop matches),
  "fields": {"owner":"","address":"","area":"","status":"","statusReason":"why the status changed, if the rep said","nextVisit":"YYYY-MM-DD","investAmount":0,"insideInfoAdd":"text to append","pricingNotesAdd":"text to append","scores":{"volume":0-5,"location":0-5,"fit":0-5,"access":0-5}},
- "visit": {"date":"YYYY-MM-DD","notes":"clean, complete summary of the visit in the rep's words"},
+ "visit": {"date":"YYYY-MM-DD","notes":"clean, complete summary of the visit in the rep's words","outcome":"positive|neutral|negative|absent","discussed":["products talked about"],"potential":"none|low|medium|high","competition":"what the competition is doing there"},
+ "order": {"date":"YYYY-MM-DD","items":[{"product":"","qty":0,"unit":""}]} (only what the shop ordered now; do not also put it in consumption),
  "contacts": [{"name":"","role":"","phone":"","email":"","notes":""}],
  "assets": [{"type":"${ASSET_TYPES.join("|")}","brand":"","serial":"","qty":"1","notes":""}],
  "posm": [{"type":"${POSM_TYPES.join("|")}","brand":"","qty":"1","notes":""}],
@@ -1467,7 +1809,8 @@ Reply with only one JSON object of this shape (omit empty fields):
  "tasks": [{"title":"short action","due":"YYYY-MM-DD or empty"}]
 }
 Write "answer", "summary", visit notes and task titles in Greek, unless the rep spoke English. Keep the field names and the type/category values exactly as listed (in English).
-Rules: if the rep describes having been at a shop, include "visit". Turn every promise or follow-up into a task with a due date when one is implied ("next week" = 7 days from today). Only include things the rep actually said; never invent serial numbers, prices or names. Use the company from the brand map when you know it. Resolve relative dates against today.
+Shop ids in your reply ("shopId", actions) are the plain id without the "s:" prefix.
+Rules: an answer must only state facts found in the records, and "sources" must list every record used (never invent ids). When the rep asks what to do, for suggestions or follow-ups, put them in "actions"; never say you changed anything, the rep approves first. If the rep describes having been at a shop, include "visit". Turn every promise or follow-up into a task with a due date when one is implied ("next week" = 7 days from today). Only include things the rep actually said; never invent serial numbers, prices or names. Use the company from the brand map when you know it. Resolve relative dates against today.
 
 The rep said:
 """${text}"""`;
@@ -1479,7 +1822,8 @@ function changeLines(r) {
   else if (shop) L.push(["Μαγαζί", shop.name]);
   const f = r.fields || {};
   Object.entries(f).forEach(([k, v]) => { if (v === "" || v == null || (typeof v === "object" && !Object.keys(v).length)) return; const label = { insideInfoAdd: "Πληροφόρηση", pricingNotesAdd: "Τιμές", nextVisit: "Επόμενη επίσκεψη", investAmount: "Επένδυση", owner: "Ιδιοκτήτης", address: "Διεύθυνση", area: "Περιοχή", status: "Κατάσταση", statusReason: "Αιτία", scores: "Αξιολόγηση" }[k] || k[0].toUpperCase() + k.slice(1); L.push([label, k === "nextVisit" ? fmtDate(v) : k === "investAmount" ? money(v) : k === "scores" ? Object.entries(v).map(([a, b]) => `${(CRITERIA.find((c) => c[0] === a) || [, a])[1]} ${b}/5`).join(", ") : k === "status" ? STATUSES[v] || v : String(v)]); });
-  if (r.visit && r.visit.notes) L.push(["Επίσκεψη " + fmtDate(r.visit.date || todayISO()), r.visit.notes]);
+  if (r.visit && r.visit.notes) L.push(["Επίσκεψη " + fmtDate(r.visit.date || todayISO()), [r.visit.notes, r.visit.outcome && "Αποτέλεσμα: " + lbl(OUTCOMES, r.visit.outcome), (r.visit.discussed || []).length && "Συζητήσαμε: " + r.visit.discussed.join(", "), r.visit.potential && "Δυναμική: " + lbl(POTENTIAL, r.visit.potential), r.visit.competition && "Ανταγωνισμός: " + r.visit.competition].filter(Boolean).join("\n")]);
+  if (r.order && (r.order.items || []).length) L.push(["Παραγγελία " + fmtDate(r.order.date || (r.visit && r.visit.date) || todayISO()), orderText(r.order)]);
   (r.contacts || []).forEach((c) => L.push(["Επαφή", [c.name, c.role, c.phone, c.email].filter(Boolean).join(", ")]));
   (r.assets || []).forEach((a) => L.push(["Εξοπλισμός", [tr(a.type), a.brand, a.serial && "S/N " + a.serial, a.qty > 1 && "×" + a.qty].filter(Boolean).join(", ")]));
   (r.posm || []).forEach((p) => L.push(["POSM", [tr(p.type), p.brand, p.qty > 1 && "×" + p.qty, p.notes].filter(Boolean).join(", ")]));
@@ -1489,19 +1833,62 @@ function changeLines(r) {
   (r.tasks || []).forEach((t) => L.push(["Εργασία", `${t.title}${t.due ? " (έως " + fmtDate(t.due) + ")" : ""}`]));
   return L;
 }
+function sourceOf(ref) {
+  const [k, a, b] = String(ref || "").split(":");
+  if (k === "v") { const v = state.visits.find((x) => x.id === a); const sh = v && shopById(v.shopId); if (v) return { shopId: v.shopId, tab: "visits", label: `Επίσκεψη ${fmtDate(v.date)}${sh ? " · " + sh.name : ""}`, sub: clip(v.notes, 90) }; }
+  if (k === "t") { const x = state.tasks.find((y) => y.id === a); if (x) return { shopId: x.shopId || "", tab: "visits", label: `Εργασία: ${x.title}`, sub: [x.due ? "έως " + fmtDate(x.due) : "", x.done ? "ολοκληρώθηκε" : "", (shopById(x.shopId) || {}).name].filter(Boolean).join(" · ") }; }
+  if (k === "o") { const sh = shopById(a), o = sh && (sh.orders || [])[Number(b)]; if (o) return { shopId: sh.id, tab: "visits", label: `Παραγγελία ${fmtDate(o.date)} · ${sh.name}`, sub: clip(orderText(o), 90) }; }
+  if (k === "s") { const sh = shopById(a); if (sh) return { shopId: sh.id, tab: "overview", label: sh.name, sub: [STATUSES[sh.status], sh.area].filter(Boolean).join(" · ") }; }
+  return null;
+}
+const plainId = (x) => String(x || "").replace(/^s:/, "");
+function talkActions(r) {
+  return (Array.isArray(r.actions) ? r.actions : []).map((x) => ({ ...x, shopId: plainId(x.shopId) })).filter((x) => (x.type === "task" && x.title) || (x.type === "nextVisit" && shopById(x.shopId) && isDate(x.date)) || (x.type === "note" && shopById(x.shopId) && x.text)).slice(0, 6);
+}
+const actLabel = (x) => x.type === "task" ? `Εργασία: ${x.title}${isDate(x.due) ? " έως " + fmtDate(x.due) : ""}` : x.type === "nextVisit" ? `Επόμενη επίσκεψη ${fmtDate(x.date)}` : `Σημείωση: ${x.text}`;
+function talkPresets() {
+  const cur = state.shopId && state.shopId !== "new" && shopById(state.shopId);
+  const P = cur ? [["Προετοιμασία επίσκεψης", `Προετοίμασε την επίσκεψή μου στο ${cur.name}.`], ["Σύνοψη σημειώσεων", `Κάνε μου σύνοψη όλων των σημειώσεων και επισκέψεων για το ${cur.name}.`], ["Τι λείπει εδώ;", `Ποια προϊόντα ή POSM λείπουν από το ${cur.name};`], ["Πρότεινε follow-ups", `Τι follow-ups προτείνεις για το ${cur.name};`]]
+    : [["Τι να κάνω σήμερα;", "Τι να κάνω σήμερα; Ποιους πελάτες να δω πρώτα και γιατί;"], ["Εκκρεμότητες εβδομάδας", "Ποιες εκκρεμότητες έχω αυτή την εβδομάδα;"], ["Ποια προϊόντα λείπουν;", "Ποια προϊόντα λείπουν από τους πελάτες μου;"], ["Ποιοι κινδυνεύουν;", "Ποιοι πελάτες κινδυνεύουν ή έχουν πέσει;"], ["Πρότεινε follow-ups", "Πρότεινε follow-ups για τις εκκρεμότητές μου."]];
+  return `<div class="talk-quick" role="group" aria-label="Γρήγορες ερωτήσεις">${P.map(([l, q]) => `<button class="chip" data-talk="preset" data-q="${esc(q)}">${esc(l)}</button>`).join("")}</div>`;
+}
+async function talkApply() {
+  const t = state.talk, acts = talkActions(t.result);
+  const pick = [...talkRoot.querySelectorAll("[data-act]")].filter((b) => b.checked).map((b) => acts[Number(b.dataset.act)]);
+  if (!pick.length) return;
+  const stamp = new Date().toISOString();
+  const ok = await guarded(async () => {
+    for (const x of pick) {
+      if (x.type === "task") await state.db.collection("tasks").doc().set({ title: x.title, due: isDate(x.due) ? x.due : "", shopId: shopById(x.shopId) ? x.shopId : "", done: false, createdAt: stamp });
+      else if (x.type === "nextVisit") await state.db.doc("shops/" + x.shopId).update({ nextVisit: x.date, updatedAt: stamp });
+      else if (x.type === "note") { const sh = shopById(x.shopId); await state.db.doc("shops/" + x.shopId).update({ insideInfo: [sh.insideInfo, `${todayISO()}: ${x.text}`].filter(Boolean).join("\n"), updatedAt: stamp }); }
+    }
+  });
+  t.applied = ok ? plural(pick.length, "αλλαγή αποθηκεύτηκε", "αλλαγές αποθηκεύτηκαν") : "";
+  t.error = ok ? "" : "Δεν αποθηκεύτηκε. Έλεγξε τη σύνδεση και δοκίμασε ξανά.";
+  renderTalk();
+  if (ok) toast(t.applied + " ✓");
+}
 function renderTalk() {
   const t = state.talk;
   if (!t || !t.open) { talkRoot.innerHTML = ""; return; }
   let body = "";
   if (t.busy) body = `<p class="thinking" role="status">Σκέφτομαι… μπορεί να πάρει έως ένα λεπτό.</p><div class="row-actions"><button class="btn" data-talk="stop">Διακοπή</button></div>`;
-  else if (t.result && t.result.kind === "answer") body = `<div class="panel answer">${esc(t.result.answer || "Δεν βρήκα απάντηση στα δεδομένα σου.")}</div><div class="row-actions"><button class="btn primary" data-talk="again">Ρώτα κάτι άλλο</button><button class="btn" data-talk="close">Τέλος</button></div>`;
+  else if (t.result && t.result.kind === "answer") {
+    const src = (t.result.sources || []).map(sourceOf).filter(Boolean), acts = talkActions(t.result);
+    body = `${t.text ? `<p class="muted small talk-q">«${esc(clip(t.text, 140))}»</p>` : ""}<div class="panel answer">${esc(t.result.answer || "Δεν βρήκα απάντηση στα δεδομένα σου.")}</div>
+    ${src.length ? `<div class="sources"><span class="eyebrow">Από τις καταχωρίσεις σου</span><ul>${src.map((x) => `<li><button class="src" data-talk="src" data-id="${esc(x.shopId)}" data-tab="${x.tab}"><b>${esc(x.label)}</b>${x.sub ? `<small>${esc(x.sub)}</small>` : ""}</button></li>`).join("")}</ul></div>` : `<p class="muted small">Δεν αναφέρθηκε συγκεκριμένη καταχώριση. Έλεγξε την απάντηση πριν βασιστείς σε αυτή.</p>`}
+    ${acts.length ? `<div class="panel"><div class="inline-form"><h3>Προτεινόμενες ενέργειες</h3><p class="muted small">Δεν αλλάζει τίποτα μέχρι να εγκρίνεις.</p><ul class="list acts">${acts.map((x, i) => `<li class="item"><input type="checkbox" class="check" id="act-${i}" data-act="${i}" ${t.applied ? "disabled" : "checked"}><label for="act-${i}" class="grow"><div class="title">${esc(actLabel(x))}</div><div class="sub">${esc(x.shopId && shopById(x.shopId) ? shopById(x.shopId).name : "Χωρίς μαγαζί")}</div></label></li>`).join("")}</ul>${t.applied ? `<p class="ok-text small" role="status">${esc(t.applied)} ✓</p>` : `<div class="row-actions"><button class="btn primary" data-talk="apply">Έγκριση επιλεγμένων</button></div>`}</div></div>` : ""}
+    ${t.error ? `<div class="banner" role="alert">${esc(t.error)}</div>` : ""}
+    <div class="row-actions"><button class="btn primary" data-talk="again">Ρώτα κάτι άλλο</button><button class="btn" data-talk="close">Τέλος</button></div>`;
+  }
   else if (t.result) {
     const lines = changeLines(t.result);
     body = `<p>${esc(t.result.summary || "Αυτά θα αποθηκεύσω:")}</p>
       <div class="panel"><ul class="change-list">${lines.length ? lines.map(([k, v]) => `<li><b>${esc(k)}</b><span>${esc(v)}</span></li>`).join("") : `<li>Δεν υπάρχει κάτι να αποθηκευτεί. Δοκίμασε ξανά λέγοντας το όνομα του μαγαζιού και τι έγινε.</li>`}</ul></div>
       ${!t.result.shopId && !t.result.newShop && lines.length ? `<div class="banner">Δεν κατάλαβα ποιο μαγαζί είναι. Πες το όνομα του μαγαζιού και δοκίμασε ξανά.</div>` : ""}
       <div class="row-actions">${lines.length && (t.result.shopId || t.result.newShop) ? `<button class="btn primary" data-talk="save">Αποθήκευση όλων</button>` : ""}<button class="btn" data-talk="again">Αλλαγή</button><button class="btn" data-talk="close">Απόρριψη</button></div>`;
-  } else body = `${Rec ? `<button class="mic-btn ${t.listening ? "on" : ""}" data-talk="mic" aria-pressed="${!!t.listening}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-2.1A7 7 0 0 0 19 12z"/></svg>${t.listening ? "Σε ακούω… πάτα για τέλος" : "Πάτα και μίλα"}</button>` : ""}
+  } else body = `${talkPresets()}${Rec ? `<button class="mic-btn ${t.listening ? "on" : ""}" data-talk="mic" aria-pressed="${!!t.listening}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-2.1A7 7 0 0 0 19 12z"/></svg>${t.listening ? "Σε ακούω… πάτα για τέλος" : "Πάτα και μίλα"}</button>` : ""}
     <label class="field" for="talk-text">${Rec ? "Ή γράψε. " : "Πάτα το μικρόφωνο στο πληκτρολόγιο και μίλα. "}Πες το όνομα του μαγαζιού, τι έγινε, τι έχουν και τι υποσχέθηκες.</label>
     <textarea id="talk-text" placeholder="π.χ. Μόλις έφυγα από την Ταβέρνα Θάλασσα στο Θησείο. Είδα τη Μαρία, την υπεύθυνη, το κινητό της είναι 694… Παρήγγειλαν 20 βαρέλια. Οι ομπρέλες μας είναι σκισμένες, θέλουν 4 καινούργιες την επόμενη εβδομάδα.">${esc(t.text || "")}</textarea>
     ${t.error ? `<div class="banner" role="alert">${esc(t.error)}</div>` : ""}
@@ -1516,7 +1903,12 @@ async function talkSend() {
   if (!t.text) { t.error = "Πες ή γράψε κάτι πρώτα."; renderTalk(); return; }
   t.busy = true; renderTalk();
   talkCtl = new AbortController();
-  try { t.result = await state.sample.json(talkPrompt(t.text), { signal: talkCtl.signal, cache: false }); if (!t.result || typeof t.result !== "object") throw { code: "invalid_json" }; }
+  try {
+    t.result = await state.sample.json(talkPrompt(t.text), { signal: talkCtl.signal, cache: false });
+    if (!t.result || typeof t.result !== "object") throw { code: "invalid_json" };
+    t.result.shopId = plainId(t.result.shopId) || null; if (t.result.shopId && !shopById(t.result.shopId)) t.result.shopId = null;
+    t.applied = "";
+  }
   catch (e) { if (e && e.code !== "cancelled") t.error = sampleErr(e); t.result = null; }
   t.busy = false; renderTalk();
 }
@@ -1537,7 +1929,18 @@ async function applyUpdate(r, stamp) {
   add("contacts", r.contacts); add("assets", r.assets); add("posm", r.posm); add("products", r.products); add("consumption", r.consumption, (c) => ({ ...c, qty: Number(c.qty) || 0 }));
   add("backbar", r.backbar, (b) => ({ brand: b.brand, company: b.company || (known[(b.brand || "").toLowerCase()] || {}).company || "", category: b.category || (known[(b.brand || "").toLowerCase()] || {}).category || "", facings: Number(b.facings) || 1 }));
   if (r.backbar && r.backbar.length) patch.backbarDate = todayISO();
-  if (r.visit && r.visit.notes) { const date = r.visit.date || todayISO(); await state.db.collection("visits").doc().set({ shopId: id, date, notes: r.visit.notes, createdAt: stamp, source: r.source || "voice" }); if (!s.lastVisit || date > s.lastVisit) patch.lastVisit = date; }
+  if (r.visit && r.visit.notes) {
+    const date = isDate(r.visit.date) ? r.visit.date : todayISO(), V = r.visit;
+    const doc = { shopId: id, date, notes: V.notes, createdAt: stamp, source: r.source || "voice" };
+    if (OUTCOMES.some((o) => o[0] && o[0] === V.outcome)) doc.outcome = V.outcome;
+    if (Array.isArray(V.discussed) && V.discussed.length) doc.discussed = V.discussed.map(String);
+    if (POTENTIAL.some((o) => o[0] && o[0] === V.potential)) doc.potential = V.potential;
+    if (V.competition) doc.competition = String(V.competition);
+    if (r.order && (r.order.items || []).length) doc.order = r.order.items.filter((i) => i && i.product);
+    await state.db.collection("visits").doc().set(doc);
+    if (!s.lastVisit || date > s.lastVisit) patch.lastVisit = date;
+  }
+  if (r.order && (r.order.items || []).length) addOrder(s, patch, isDate(r.order.date) ? r.order.date : (r.visit && isDate(r.visit.date) ? r.visit.date : todayISO()), r.order.items, r.source || "voice");
   await state.db.doc("shops/" + id).update(patch);
   for (const tk of r.tasks || []) await state.db.collection("tasks").doc().set({ title: tk.title, due: tk.due || "", shopId: id, done: false, createdAt: stamp });
   return id;
@@ -1547,7 +1950,7 @@ async function talkSave() {
   state.busy = true;
   const ok = await guarded(async () => { id = await applyUpdate(r, stamp); });
   state.busy = false;
-  if (ok) { state.talk = null; renderTalk(); openShop(id, { tab: r.visit ? "visits" : "overview" }); }
+  if (ok) { state.talk = null; renderTalk(); openShop(id, { tab: r.visit ? "visits" : "overview" }); toast("Αποθηκεύτηκε ✓"); }
   else renderTalk();
 }
 const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1583,7 +1986,10 @@ talkRoot.addEventListener("click", (ev) => {
   if (a === "mic") toggleMic();
   else if (a === "send") { if (rec && state.talk.listening) rec.stop(); talkSend(); }
   else if (a === "stop") talkCtl && talkCtl.abort();
-  else if (a === "again") { state.talk.result = null; renderTalk(); }
+  else if (a === "again") { const t = state.talk, wasAnswer = t.result && t.result.kind === "answer"; if (wasAnswer) { t.history = [...(t.history || []), { q: t.text, a: clip(t.result.answer, 600) }].slice(-3); t.text = ""; } t.result = null; t.applied = ""; renderTalk(); }
+  else if (a === "preset") { const ta = document.getElementById("talk-text"); if (ta) ta.value = b.dataset.q; talkSend(); }
+  else if (a === "apply") { b.disabled = true; b.textContent = "Αποθήκευση…"; talkApply(); }
+  else if (a === "src") { const id = b.dataset.id; if (id && shopById(id)) { state.talk = null; renderTalk(); openShop(id, { tab: b.dataset.tab }); } }
   else if (a === "close") { if (rec && state.talk.listening) rec.stop(); state.talk = null; renderTalk(); }
   else if (a === "save") { b.disabled = true; talkSave(); }
 });
