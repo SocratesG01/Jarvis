@@ -16,15 +16,51 @@ function merge(base, patch) {
 const rid = () => (crypto.randomUUID ? crypto.randomUUID().replace(/-/g, "").slice(0, 20) : Math.random().toString(36).slice(2) + Date.now().toString(36));
 const safe = (fn, fallback) => { try { return fn(); } catch { return fallback; } };
 
+/* The phone's offline copy lives in IndexedDB: localStorage is capped at about 5 MB on iPhone,
+   which hundreds of shops with years of visits would outgrow. */
+const idb = (() => {
+  let dbp = null;
+  const open = () => dbp || (dbp = new Promise((res, rej) => {
+    if (!window.indexedDB) return rej(new Error("no_idb"));
+    const r = indexedDB.open("jarvis", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("kv");
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => { dbp = null; rej(r.error); };
+  }));
+  const run = async (mode, fn) => { const db = await open(); return new Promise((res, rej) => { const t = db.transaction("kv", mode); const req = fn(t.objectStore("kv")); t.oncomplete = () => res(req ? req.result : undefined); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); }); };
+  return { get: (k) => run("readonly", (st) => st.get(k)), set: (k, v) => run("readwrite", (st) => st.put(v, k)) };
+})();
+
 export function makeDb(uid, onStatus = () => {}) {
   const CACHE_KEY = "jarvis-cache-" + uid, QUEUE_KEY = "jarvis-queue-" + uid;
-  const cache = safe(() => JSON.parse(localStorage.getItem(CACHE_KEY)) || {}, {});
-  let queue = safe(() => JSON.parse(localStorage.getItem(QUEUE_KEY)) || [], []);
+  // Older versions kept the copy in localStorage: read it once, then move it to IndexedDB.
+  const legacy = safe(() => JSON.parse(localStorage.getItem(CACHE_KEY)), null);
+  const cache = legacy || {};
+  const qRaw = safe(() => localStorage.getItem(QUEUE_KEY), null);
+  let queue = qRaw && qRaw !== "idb" ? safe(() => JSON.parse(qRaw) || [], []) : [];
   const subs = new Set();
-  let saveTimer = null;
+  let saveTimer = null, cacheReady = false;
 
-  const persist = () => { clearTimeout(saveTimer); saveTimer = setTimeout(() => safe(() => localStorage.setItem(CACHE_KEY, JSON.stringify(cache))), 300); };
-  const saveQueue = () => safe(() => localStorage.setItem(QUEUE_KEY, JSON.stringify(queue)));
+  const persist = () => {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      if (!cacheReady) return persist();
+      idb.set(CACHE_KEY, cache).then(() => { if (legacy) safe(() => localStorage.removeItem(CACHE_KEY)); })
+        .catch(() => safe(() => localStorage.setItem(CACHE_KEY, JSON.stringify(cache))));
+    }, 600);
+  };
+  // The offline queue stays in localStorage (written at once); if it gets too big for it, it goes to IndexedDB.
+  const saveQueue = () => { try { localStorage.setItem(QUEUE_KEY, JSON.stringify(queue)); } catch { idb.set(QUEUE_KEY, queue).then(() => safe(() => localStorage.setItem(QUEUE_KEY, "idb"))).catch(() => {}); } };
+  async function loadLocal() {
+    try {
+      if (qRaw === "idb") queue = (await idb.get(QUEUE_KEY)) || [];
+      const saved = await idb.get(CACHE_KEY);
+      if (saved && !legacy) { Object.keys(cache).forEach((k) => delete cache[k]); Object.assign(cache, saved); }
+    } catch {}
+    cacheReady = true;
+    if (legacy) persist();
+    [...new Set([...subs].map((s) => s.coll))].forEach(notify);
+  }
   const coll = (c) => (cache[c] = cache[c] || {});
   const notify = (c) => subs.forEach((s) => s.coll === c && s.fire());
   const status = () => onStatus({ online: navigator.onLine, pending: queue.length });
@@ -117,7 +153,7 @@ export function makeDb(uid, onStatus = () => {}) {
   const db = { doc: (path) => { const [c, id] = path.split("/"); return docRef(c, id); }, collection: (c) => query(c) };
   return {
     db,
-    async start() { status(); if (navigator.onLine) { await flush(); await loadAll().catch(() => {}); listen(); } },
+    async start() { await loadLocal(); status(); if (navigator.onLine) { await flush(); await loadAll().catch(() => {}); listen(); } },
     hasCache: () => Object.keys(cache).length > 0,
     exportAll: () => JSON.parse(JSON.stringify(cache)),
   };
@@ -128,6 +164,8 @@ export function makeDb(uid, onStatus = () => {}) {
 export function makeAssets(uid) {
   const URL_KEY = "jarvis-urls-" + uid;
   const urls = safe(() => JSON.parse(localStorage.getItem(URL_KEY)) || {}, {});
+  // Signed links last 6 days; forget older ones so this list doesn't grow forever.
+  Object.keys(urls).forEach((k) => { if (!urls[k] || Date.now() - urls[k].t > 5 * 86400000) delete urls[k]; });
   const bucket = () => sb.storage.from("photos");
   let pending = new Set(), timer = null;
   async function resolve() {

@@ -36,7 +36,9 @@ const money = (n) => (n === "" || n == null || isNaN(Number(n))) ? "" : new Intl
 const pad = (n) => String(n).padStart(2, "0");
 const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
 const daysBetween = (a, b) => Math.round((new Date(b + "T00:00:00") - new Date(a + "T00:00:00")) / 86400000);
-const fmtDate = (iso) => iso ? new Date(iso + "T00:00:00").toLocaleDateString("el-GR", { day: "numeric", month: "short" }) : "";
+const dateFmt = new Intl.DateTimeFormat("el-GR", { day: "numeric", month: "short" }), dateMemo = new Map();
+const fmtDate = (iso) => { if (!iso) return ""; let r = dateMemo.get(iso); if (r == null) { r = dateFmt.format(new Date(iso + "T00:00:00")); dateMemo.set(iso, r); } return r; };
+const byName = new Intl.Collator("el", { sensitivity: "base", numeric: true }).compare;
 const fmtMonth = (ym) => ym ? new Date(ym + "-01T00:00:00").toLocaleDateString("el-GR", { month: "short", year: "2-digit" }) : "";
 const uid = () => Math.random().toString(36).slice(2, 8) + Date.now().toString(36);
 const img = (id) => `data-photo="${esc(id)}" src="${state.assets ? state.assets.src(id) : ""}"`;
@@ -60,7 +62,16 @@ const mainContact = (s) => (s.contacts || []).find((c) => c.phone) || (s.contact
 const telHref = (p) => "tel:" + String(p).replace(/[^\d+]/g, "");
 const lastOrder = (s) => (s.orders || []).slice().sort((a, b) => (b.date || "").localeCompare(a.date || ""))[0] || null;
 const orderText = (o) => (o.items || []).map((i) => [i.product, i.qty, i.unit].filter((x) => x !== "" && x != null).join(" ")).join(", ") || o.notes || "";
-const visitsOf = (id) => state.visits.filter((v) => v.shopId === id).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+/* Visits per shop, newest first; rebuilt only when the visits list changes (fast with thousands of visits). */
+let visitIdx = null, visitIdxOf = null;
+function visitsOf(id) {
+  if (visitIdxOf !== state.visits) {
+    visitIdx = new Map(); visitIdxOf = state.visits;
+    state.visits.forEach((v) => { const a = visitIdx.get(v.shopId); a ? a.push(v) : visitIdx.set(v.shopId, [v]); });
+    visitIdx.forEach((a) => a.sort((x, y) => (y.date || "").localeCompare(x.date || "")));
+  }
+  return visitIdx.get(id) || [];
+}
 const visitedOn = (day) => new Set(state.visits.filter((v) => v.date === day).map((v) => v.shopId));
 /* The next thing to do for a shop: its earliest open task or its planned visit. */
 function nextActionOf(s) {
@@ -610,7 +621,7 @@ function salesData(off = 0) {
   lost.forEach((h) => missed.push({ id: h.shop.id, text: `Χάσαμε το ${h.shop.name}`, sub: `${STATUSES[h.to] || h.to}${h.reason ? " · " + h.reason : ""}`, w: 4 }));
   return { cur, prev, off, frac, now, before, won, lost, targets, visits, visitTarget, accountsTarget, byShop, missed: missed.sort((a, b) => b.w - a.w) };
 }
-const fmtQty = (n) => new Intl.NumberFormat("el-GR", { maximumFractionDigits: 1 }).format(Number(n) || 0);
+const qtyFmt = new Intl.NumberFormat("el-GR", { maximumFractionDigits: 1 }), fmtQty = (n) => qtyFmt.format(Number(n) || 0);
 function salesSummary() { const d = salesData(0); return { targets: d.targets.length, hit: d.targets.filter((x) => x.pct >= 1).length, won: d.won.length }; }
 function viewSales() {
   const off = state.salesMonth || 0, d = salesData(off), dist = distribution(), posm = posmSpread();
@@ -779,17 +790,46 @@ Match rows to known shops by name (allow Greek/Latin spellings and small differe
  }],
  "catalogue": {"company":"","items":[{"brand":"","product":"","category":"${CATEGORIES.join("|")}","size":"","price":""}]} or null (only if the file is a supplier price list / catalogue not tied to one shop)
 }
-Omit empty fields. Only include what the file actually says; never invent numbers. Keep field names and type/category values exactly as listed. At most 80 updates.
-${inp.text ? `\nFile "${inp.name}":\n"""\n${inp.text}\n"""` : `\nThe file "${inp.name}" is attached as a PDF.`}`;
+Omit empty fields. Only include what the file actually says; never invent numbers. Keep field names and type/category values exactly as listed. At most 80 updates; for a customer list, one update per row.
+${inp.part ? `This is part ${inp.part[0]} of ${inp.part[1]} of a long file (the header row is repeated); handle only these rows.\n` : ""}${inp.text ? `\nFile "${inp.name}":\n"""\n${inp.text}\n"""` : `\nThe file "${inp.name}" is attached as a PDF.`}`;
+}
+/* Splits a long table into parts of FILE_ROWS rows, repeating the sheet name and header row in each,
+   so a 500-customer list is read in full instead of being cut off. */
+const FILE_ROWS = 50;
+function fileParts(text) {
+  const lines = String(text).split(/\r?\n/), parts = [];
+  let sheet = "", header = null, rows = [];
+  const push = () => { if (rows.length) parts.push([sheet, header, ...rows].filter((x) => x != null && x !== "").join("\n")); rows = []; };
+  for (const ln of lines) {
+    if (/^### Sheet: /.test(ln)) { push(); sheet = ln; header = null; continue; }
+    if (!ln.replace(/[,;\s]/g, "")) continue;
+    if (header == null) { header = ln; continue; }
+    rows.push(ln);
+    if (rows.length >= FILE_ROWS) push();
+  }
+  push();
+  return parts.length ? parts : [text];
 }
 async function readFile(file, note) {
   state.fileJob = { name: file.name, busy: true }; render();
   try {
     const inp = await fileToInput(file);
-    const r = await state.sample.json(filePrompt(inp, note), { documents: inp.documents, cache: false });
-    if (!r || typeof r !== "object") throw { code: "invalid_json" };
-    r.updates = (r.updates || []).filter((u) => (u.shopId && shopById(u.shopId)) || u.newShop);
-    state.fileJob = { name: file.name, result: r };
+    const parts = inp.text ? fileParts(inp.text) : [""];
+    const all = { summary: "", updates: [], catalogue: null };
+    for (let i = 0; i < parts.length; i++) {
+      if (parts.length > 1) { state.fileJob = { name: file.name, busy: true, part: i + 1, parts: parts.length }; render(); }
+      const r = await state.sample.json(filePrompt(parts.length > 1 ? { ...inp, text: parts[i], part: [i + 1, parts.length] } : inp, note), { documents: inp.documents, cache: false });
+      if (!r || typeof r !== "object") { if (parts.length > 1) continue; throw { code: "invalid_json" }; }
+      if (!all.summary && r.summary) all.summary = r.summary;
+      all.updates.push(...(r.updates || []));
+      if (r.catalogue && r.catalogue.company) { if (!all.catalogue) all.catalogue = { company: r.catalogue.company, items: [] }; all.catalogue.items.push(...(r.catalogue.items || [])); }
+    }
+    // The same new shop can appear in two parts: keep one.
+    const seen = new Set();
+    all.updates = all.updates.filter((u) => (u.shopId && shopById(u.shopId)) || u.newShop).filter((u) => { if (!u.newShop) return true; const k = loose(u.newShop.name); if (seen.has(k)) return false; seen.add(k); return true; });
+    if (parts.length > 1) all.summary = `${all.summary} (Διάβασα όλο το αρχείο σε ${parts.length} μέρη: ${plural(all.updates.length, "μαγαζί", "μαγαζιά")}.)`;
+    if (!all.updates.length && !all.catalogue) throw { code: "invalid_json" };
+    state.fileJob = { name: file.name, result: all };
   } catch (e) {
     state.fileJob = { name: file.name, error: e && e.code === "file_big" ? "Το αρχείο είναι πολύ μεγάλο για μία φορά. Χώρισέ το σε μικρότερα (π.χ. ένα φύλλο ή λίγες σελίδες τη φορά)." : e && e.code === "invalid_json" ? "Δεν βρήκα κάτι να περάσω από αυτό το αρχείο." : sampleErr(e) };
   }
@@ -800,7 +840,11 @@ async function fileSave() {
   const r = state.fileJob.result, stamp = new Date().toISOString();
   state.busy = true; state.fileJob.saving = true; render();
   const ok = await guarded(async () => {
-    for (const u of r.updates) await applyUpdate({ ...u, source: "file" }, stamp);
+    let n = 0;
+    for (const u of r.updates) {
+      await applyUpdate({ ...u, source: "file" }, stamp);
+      if (++n % 10 === 0 && r.updates.length > 20) { const b = document.querySelector('[data-action="file-save"]'); if (b) b.textContent = `Αποθήκευση ${n} από ${r.updates.length}…`; }
+    }
     if (r.catalogue && r.catalogue.company && (r.catalogue.items || []).length) {
       const ex = state.catalogues.find((c) => (c.company || "").toLowerCase() === r.catalogue.company.toLowerCase());
       if (ex) await state.db.doc("catalogues/" + ex.id).update({ items: [...(ex.items || []), ...r.catalogue.items] });
@@ -815,7 +859,7 @@ function viewFiles() {
   const j = state.fileJob;
   const nm = (u) => u.newShop ? u.newShop.name : (shopById(u.shopId) || {}).name;
   let body = "";
-  if (j && j.busy) body = `<div class="panel notice"><span class="spinner"></span><div class="grow"><b>Διαβάζω το «${esc(j.name)}»…</b><div class="sub">Μπορεί να πάρει ένα λεπτό για μεγάλα αρχεία.</div></div></div>`;
+  if (j && j.busy) body = `<div class="panel notice"><span class="spinner"></span><div class="grow"><b>Διαβάζω το «${esc(j.name)}»…${j.parts ? ` μέρος ${j.part} από ${j.parts}` : ""}</b><div class="sub">${j.saving ? `Αποθήκευση ${j.done || 0} από ${j.total}…` : j.parts ? "Μεγάλο αρχείο: το διαβάζω κομμάτι κομμάτι για να μη χαθεί καμία γραμμή. Άφησε την εφαρμογή ανοιχτή." : "Μπορεί να πάρει ένα λεπτό για μεγάλα αρχεία."}</div></div></div>`;
   else if (j && j.error) body = `<div class="banner">${esc(j.error)}</div>`;
   else if (j && j.saved) body = `<div class="panel notice"><div class="grow"><b>Έτοιμο ✓</b><div class="sub">${esc(j.saved)}</div></div></div>`;
   else if (j && j.result) {
@@ -959,7 +1003,7 @@ function viewShops() {
   const byStatus = state.shops.filter((s) => state.shopFilter === "all" || s.status === state.shopFilter);
   const areaCounts = {}; byStatus.forEach((s) => { const a = areaOf(s); areaCounts[a] = (areaCounts[a] || 0) + 1; });
   let list = byStatus.filter((s) => state.areaFilter === "all" || areaOf(s) === state.areaFilter);
-  if (q) { const nq = norm(q); list = list.filter((s) => norm([s.name, s.area, s.city, s.owner, s.type, tr(s.type), s.address, s.insideInfo, ...(s.contacts || []).flatMap((c) => [c.name, c.role, c.phone, c.email]), ...(s.products || []).map((p) => p.name), ...(s.backbar || []).map((b) => b.brand)].join(" ")).includes(nq) || norm(String(q).replace(/\s/g, "")).length > 3 && (s.contacts || []).some((c) => String(c.phone || "").replace(/\s/g, "").includes(String(q).replace(/\s/g, "")))); }
+  if (q) { const nq = loose(q); list = list.filter((s) => loose([s.name, s.area, s.city, s.owner, s.type, tr(s.type), s.address, s.insideInfo, ...(s.contacts || []).flatMap((c) => [c.name, c.role, c.phone, c.email]), ...(s.products || []).map((p) => p.name), ...(s.backbar || []).map((b) => b.brand)].join(" ")).includes(nq) || norm(String(q).replace(/\s/g, "")).length > 3 && (s.contacts || []).some((c) => String(c.phone || "").replace(/\s/g, "").includes(String(q).replace(/\s/g, "")))); }
   const prospectMode = state.shopFilter === "prospect";
   const groups = {};
   list.forEach((s) => (groups[areaOf(s)] = groups[areaOf(s)] || []).push(s));
@@ -976,8 +1020,18 @@ function viewShops() {
   } else if (prospectMode) {
     const ranked = list.slice().sort((a, b) => (scoreOf(b) ?? -1) - (scoreOf(a) ?? -1));
     body = `<p class="muted small">Κατάταξη με βαθμό στα 100 από τέσσερις αξιολογήσεις: ${CRITERIA.map((c) => c[1].toLowerCase()).join(", ")}.</p><div class="panel"><ul class="list">${ranked.map((s, i) => shopRow(s, "", i + 1)).join("")}</ul></div>`;
-  } else body = Object.keys(groups).sort((a, b) => a === "Χωρίς περιοχή" ? 1 : b === "Χωρίς περιοχή" ? -1 : a.localeCompare(b)).map((a) => `<section class="section"><div class="section-head"><h2>${esc(a)}</h2><span class="muted small num">${groups[a].length}</span></div>
-      <div class="panel"><ul class="list">${groups[a].sort((x, y) => (x.name || "").localeCompare(y.name || "")).map((s) => shopRow(s, "", null, true)).join("")}</ul></div></section>`).join("");
+  } else {
+    // With hundreds of shops, show the first few per area; "Όλα" opens the whole area.
+    const many = list.length > 120 && state.areaFilter === "all", cap = q ? 100 : many ? 6 : Infinity;
+    let shown = 0;
+    body = Object.keys(groups).sort((a, b) => a === "Χωρίς περιοχή" ? 1 : b === "Χωρίς περιοχή" ? -1 : byName(a, b)).map((a) => {
+      const all = groups[a].sort((x, y) => byName(x.name || "", y.name || "")), rows = q ? all.slice(0, Math.max(0, cap - shown)) : all.slice(0, cap);
+      shown += rows.length;
+      if (!rows.length) return "";
+      return `<section class="section"><div class="section-head"><h2>${esc(a)}</h2>${all.length > rows.length && !q ? `<button class="link" data-action="area" data-a="${esc(a)}">Όλα (${all.length}) ›</button>` : `<span class="muted small num">${all.length}</span>`}</div>
+      <div class="panel"><ul class="list">${rows.map((s) => shopRow(s, "", null, true)).join("")}</ul></div></section>`;
+    }).join("") + (q && list.length > shown ? `<p class="muted small center">Δείχνω ${shown} από ${list.length}. Γράψε περισσότερα για να βρεις αυτό που ψάχνεις.</p>` : "");
+  }
   return `${banner()}
   <div class="search">${ic('<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>')}<input id="shop-search" type="search" placeholder="Αναζήτηση: όνομα, επαφή, τηλέφωνο, προϊόν" value="${esc(state.query)}" data-action="search" aria-label="Αναζήτηση μαγαζιών"></div>
   <div class="scroller"><button class="chip" data-action="near" aria-pressed="${!!state.near}">📍 Κοντά μου</button>${chip("all", "Όλα")}${chip("active", "Πελάτες")}${chip("az", "ΑΖ")}${chip("competitor", "Ανταγωνισμός")}${chip("prospect", "Υποψήφιοι")}${chip("closed", "Έκλεισαν")}${chip("lost", "Χαμένοι")}</div>
@@ -1769,8 +1823,52 @@ function toast(msg) {
 const talkRoot = document.getElementById("talk-root");
 let talkCtl = null;
 /* Everything Jarvis may answer from. Records carry ids (v: visit, t: task, o: order, s: shop) so answers can cite them. */
-function digest(full, curId = null) {
-  return state.shops.map((s) => {
+/* ---------- picking what Jarvis needs to see (works with hundreds of shops) ---------- */
+const GR_LAT = { α: "a", β: "v", γ: "g", δ: "d", ε: "e", ζ: "z", η: "i", θ: "th", ι: "i", κ: "k", λ: "l", μ: "m", ν: "n", ξ: "x", ο: "o", π: "p", ρ: "r", σ: "s", ς: "s", τ: "t", υ: "y", φ: "f", χ: "ch", ψ: "ps", ω: "o" };
+/* A loose Latin spelling, so "Ταβέρνα Θάλασσα" and "Taverna Thalassa" compare equal. */
+const loose = (x) => norm(x).replace(/[α-ω]/g, (c) => GR_LAT[c] || c).replace(/ks/g, "x").replace(/mp/g, "b").replace(/ch/g, "h").replace(/th/g, "t").replace(/ph/g, "f").replace(/[yw]/g, (c) => c === "y" ? "i" : "o").replace(/ou/g, "u").replace(/([a-z])\1/g, "$1").replace(/[^a-z0-9]+/g, " ").trim();
+const NAME_STOP = new Set(["taverna", "tavern", "bar", "kafe", "cafe", "kafeneio", "kafenio", "hotel", "otel", "restaurant", "estiatorio", "uzeri", "ouzeri", "bistro", "club", "beach", "the", "kai", "to", "ta", "tu", "tis", "ton", "i", "o", "cocktail", "cofee", "cafeteria", "kafeteria", "mezedopoleio", "psistaria", "suvlaki", "pizeria", "bakaliko", "grill", "lounge", "and"]);
+/* Shop ids ranked by how much this request is about them: named, open now, near, on today's route, urgent. */
+function relevantShops(text, curId, history = [], max = 25) {
+  const words = new Set(loose([text, ...history.map((h) => h.q + " " + h.a)].join(" ")).split(" ").filter(Boolean));
+  const wordList = [...words];
+  const hit = (tok) => words.has(tok) || (tok.length >= 5 && wordList.some((w) => w.length >= 5 && (w.startsWith(tok.slice(0, -2)) || tok.startsWith(w.slice(0, -2)))));
+  const t = todayISO(), week = addDays(t, 7), here = state.here && Date.now() - state.here.at < 15 * 60000 ? state.here : null;
+  const route = new Set((state.route && state.route.day === t ? state.route.ids : []) || []);
+  const late = new Map(), soon = new Map();
+  state.tasks.forEach((x) => { if (x.done || !x.shopId || !x.due) return; if (x.due < t) late.set(x.shopId, 1); else if (x.due <= week) soon.set(x.shopId, 1); });
+  const prio = new Set(priorities().slice(0, 15).map((p) => p.s.id));
+  const loweredText = " " + loose(text) + " "; let named = false;
+  const scored = state.shops.map((s) => {
+    let sc = 0;
+    const full = loose(s.name);
+    if (full && full.length >= 4 && loweredText.includes(" " + full + " ")) sc += 600;
+    else {
+      const toks = full.split(" ").filter((w) => /^\d+$/.test(w) || (w.length >= 3 && !NAME_STOP.has(w)));
+      const alpha = toks.filter((w) => !/^\d+$/.test(w) && hit(w)).length;
+      if (alpha) sc += 150 * alpha + 60 * toks.filter((w) => /^\d+$/.test(w) && words.has(w)).length;
+    }
+    named = named || sc > 0;
+    if (s.area && words.has(loose(s.area))) sc += 40;
+    if (s.id === curId) sc += 1000;
+    if (here && hasGeo(s) && distKm(here, s) < 0.3) sc += 300;
+    if (route.has(s.id) || s.nextVisit === t) sc += 120;
+    if (late.has(s.id)) sc += 60; else if (soon.has(s.id)) sc += 25;
+    if (prio.has(s.id)) sc += 30;
+    if (s.lastVisit && s.lastVisit >= addDays(t, -3)) sc += 20;
+    return [s.id, sc];
+  }).filter(([, sc]) => sc > 0).sort((a, b) => b[1] - a[1]);
+  // When the rep names a shop, send fewer extras so the request stays small.
+  return scored.slice(0, named ? Math.min(max, 15) : max).map(([id]) => id);
+}
+/* One short line per shop, for everything not sent in full. */
+function compactLine(s) {
+  const lo = lastOrder(s);
+  return ["s:" + s.id, s.name, s.status, s.area || "", s.type || "", s.lastVisit || "-", s.nextVisit || "-", lo ? lo.date : "-"].join(" | ");
+}
+function digest(full, curId = null, only = null) {
+  const dist = full ? distribution() : null, posm = full ? posmSpread() : null;
+  return (only ? only.map(shopById).filter(Boolean) : state.shops).map((s) => {
     const d = { id: "s:" + s.id, name: s.name, area: s.area || "", status: s.status, type: s.type || "" };
     if (hasGeo(s)) { d.lat = +s.lat.toFixed(5); d.lng = +s.lng.toFixed(5); }
     if (full) {
@@ -1778,7 +1876,7 @@ function digest(full, curId = null) {
       Object.assign(d, { owner: s.owner || "", address: s.address || "", lastVisit: s.lastVisit || "", nextVisit: s.nextVisit || "", investAmount: s.investAmount || "", score: scoreOf(s), contacts: (s.contacts || []).map((c) => [c.name, c.role && `(${c.role})`, c.phone, c.email].filter(Boolean).join(" ")), assets: (s.assets || []).map((a) => `${a.type} ${a.brand || ""} S/N ${a.serial || "-"} x${a.qty || 1}${a.notes ? " " + a.notes : ""}`), posm: (s.posm || []).map((p) => `${p.type} ${p.brand || ""} x${p.qty || 1}${p.notes ? " " + p.notes : ""}`), backbar: (s.backbar || []).map((b) => `${b.brand} (${b.company || "?"}) x${b.facings || 1}`), products: (s.products || []).map((p) => `${p.name} ${p.price || ""}`), consumption: (s.consumption || []).slice(-24).map((c) => `${c.month} ${c.product} ${c.qty} ${c.unit || ""}`), insideInfo: clip(s.insideInfo, mine ? 2000 : 500), pricingNotes: clip(s.pricingNotes, 300),
         visits: visitsOf(s.id).slice(0, mine ? 12 : 3).map((v) => ({ id: "v:" + v.id, date: v.date, notes: clip(v.notes, mine ? 900 : 260), outcome: v.outcome || undefined, competition: v.competition || undefined })),
         orders: (s.orders || []).map((o, i) => ({ id: `o:${s.id}:${i}`, date: o.date, items: orderText(o) })).slice(-6),
-        missing: oppsFor(s).map((o) => o.text) });
+        missing: oppsFor(s, dist, posm).map((o) => o.text) });
     }
     return d;
   });
@@ -1787,8 +1885,14 @@ function talkPrompt(text, opts = {}) {
   const cur = state.shopId && state.shopId !== "new" ? shopById(state.shopId) : null;
   const companies = [...new Set(state.catalogues.map((c) => c.company))];
   const brandMap = Object.entries(brandIndex()).slice(0, 400).map(([b, v]) => `${b} = ${v.company}`).join("; ");
-  const openTasks = state.tasks.filter((t) => !t.done).map((t) => ({ id: "t:" + t.id, title: t.title, due: t.due, shop: (shopById(t.shopId) || {}).name || "", shopId: t.shopId ? "s:" + t.shopId : "" }));
-  const hist = (opts.history || (state.talk && state.talk.history) || []).map((h) => `Rep: ${h.q}\nJarvis: ${h.a}`).join("\n\n");
+  const histArr = opts.history || (state.talk && state.talk.history) || [];
+  const hist = histArr.map((h) => `Rep: ${h.q}\nJarvis: ${h.a}`).join("\n\n");
+  const fullIds = relevantShops(text, cur && cur.id, histArr), fullSet = new Set(fullIds);
+  const others = state.shops.filter((s) => !fullSet.has(s.id));
+  const horizon = addDays(todayISO(), 14);
+  const allOpen = state.tasks.filter((t) => !t.done).sort((a, b) => (a.due || "9999").localeCompare(b.due || "9999"));
+  const pickTasks = allOpen.filter((t) => fullSet.has(t.shopId) || !t.due || t.due <= horizon).slice(0, 120);
+  const openTasks = pickTasks.map((t) => ({ id: "t:" + t.id, title: t.title, due: t.due, shop: (shopById(t.shopId) || {}).name || "", shopId: t.shopId ? "s:" + t.shopId : "" }));
   return `You are Jarvis, the field assistant of a HoReCa sales rep in Greece who visits cafés, bars, restaurants and hotels. The rep just spoke (dictated, so expect typos, Greek names in Latin or Greek letters, and loose phrasing). Today is ${todayISO()}.
 ${state.here && Date.now() - state.here.at < 10 * 60000 ? `The rep's phone GPS says they are at ${state.here.lat.toFixed(5)}, ${state.here.lng.toFixed(5)}. Shops with lat/lng nearby (under ~80 m) are likely the one they mean if they don't name it.` : ""}
 ${cur ? `The rep currently has this shop open, so assume they mean it unless they name another: ${cur.name} (id ${cur.id}).` : ""}
@@ -1796,9 +1900,12 @@ ${cur ? `The rep currently has this shop open, so assume they mean it unless the
 Decide whether the rep is REPORTING information to save, or ASKING a question about their data.
 
 Shop status meanings: active = our customer, az = an ΑΖ shop, competitor = a shop that works with the competition, prospect = possible new customer, closed / lost.
-Known shops (full data; "missing" = products or POSM most of the rep's customers have but this shop lacks):
-${JSON.stringify(digest(true, cur && cur.id))}
-Open tasks: ${JSON.stringify(openTasks)}
+The rep has ${state.shops.length} shops in total.
+Shops most relevant to this request (full data; "missing" = products or POSM most of the rep's customers have but this shop lacks):
+${JSON.stringify(digest(true, cur && cur.id, fullIds))}
+${others.length ? `All other shops, one per line (id | name | status | area | type | last visit | next visit | last order date). Use these to identify a shop or for counts and lists; for anything else about one of them, say what you know and that the full details are on the shop's page in the app:
+${others.map(compactLine).join("\n")}` : ""}
+Open tasks (${allOpen.length} in total${allOpen.length > openTasks.length ? `; shown: overdue, due within 14 days, undated and those of the shops above` : ""}): ${JSON.stringify(openTasks)}
 Company catalogues: ${JSON.stringify(companies)}
 The rep's own company: ${state.settings.myCompany || "not set"}
 ${hist ? `Earlier in this conversation:
@@ -2269,7 +2376,7 @@ async function startApp(session) {
   const db = state.db;
   db.collection("shops").onSnapshot((snap) => { state.shops = snap.docs.map(clean); state.loaded.shops = true; safeRender(); });
   db.collection("tasks").onSnapshot((snap) => { state.tasks = snap.docs.map(clean); state.loaded.tasks = true; safeRender(); });
-  db.collection("visits").orderBy("date", "desc").limit(500).onSnapshot((snap) => { state.visits = snap.docs.map(clean); safeRender(); });
+  db.collection("visits").orderBy("date", "desc").onSnapshot((snap) => { state.visits = snap.docs.map(clean); safeRender(); });
   db.collection("catalogues").onSnapshot((snap) => { state.catalogues = snap.docs.map(clean); safeRender(); });
   db.doc("meta/settings").onSnapshot((d) => { state.settings = d.exists ? d.data() : {}; safeRender(); loadCalendar(); });
   db.doc("meta/watch").onSnapshot((d) => { state.watch = d.exists ? d.data() : {}; safeRender(); });
