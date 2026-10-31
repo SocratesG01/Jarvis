@@ -132,12 +132,23 @@ function nav(view) { if (location.hash.slice(1) === view) go(view); else locatio
 function go(view) { Object.assign(state, { reading: null, view, shopId: null, catId: null, editing: false, armed: null, dirty: false }); render(); window.scrollTo(0, 0); }
 function openShop(id, opts = {}) { Object.assign(state, { reading: null, shopId: id, catId: null, editing: !!opts.edit, armed: null, dirty: false, shopTab: opts.tab || "overview", consProduct: null }); render(); window.scrollTo(0, 0); }
 function openCat(id) { Object.assign(state, { reading: null, catId: id, shopId: null, editing: false, armed: null, dirty: false }); render(); window.scrollTo(0, 0); }
-function routeFromHash() { const h = location.hash.slice(1); go(PAGES.includes(h) ? h : "today"); }
+function routeFromHash() {
+  const h = location.hash.slice(1);
+  if (/^car\b/.test(h)) { // opened from the Siri shortcut / home-screen shortcut: car mode, maybe with a question already asked
+    const q = (new URLSearchParams(h.split("?")[1] || "").get("q") || "").trim();
+    try { sessionStorage.setItem("jarvis-welcomed", "1"); } catch {}
+    history.replaceState(null, "", "#today"); go("today");
+    if (state.sample) openCar({ fromLink: true, q }); else state.carPending = { fromLink: true, q };
+    return;
+  }
+  go(PAGES.includes(h) ? h : "today");
+}
 window.addEventListener("hashchange", routeFromHash);
 document.querySelector("nav.tabs").addEventListener("click", (ev) => { const a = ev.target.closest("a[data-tab]"); if (a && location.hash.slice(1) === a.dataset.tab) { ev.preventDefault(); go(a.dataset.tab); } });
 
 /* ---------- shared bits ---------- */
 const ic = (d) => `<svg viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
+const CAR_ICON = ic('<path d="M5 16l1.5-5.2A2 2 0 0 1 8.4 9.3h7.2a2 2 0 0 1 1.9 1.5L19 16"/><rect x="3.5" y="15" width="17" height="4.5" rx="1.5"/><circle cx="7.5" cy="17.3" r="1"/><circle cx="16.5" cy="17.3" r="1"/>');
 const ICON = {
   mic: ic('<path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/><path d="M18 11a6 6 0 0 1-12 0M12 17v4"/>'),
   plus: ic('<path d="M12 5v14M5 12h14"/>'),
@@ -357,6 +368,7 @@ function viewToday() {
     <div class="jx-top"><h1 class="jx-hi">${greeting()}${name ? `, <span class="jx-name">${esc(name)}</span>` : ""}</h1>${weatherHtml()}</div>
     <p class="jx-brief"><b>${esc(new Date().toLocaleDateString("el-GR", { weekday: "long", day: "numeric", month: "long" }))}</b><br>${brief}</p>
     ${canEdit() ? `<button class="jx-start" data-action="start-day">${started ? ICON.route : ICON.play}<span><b>${started ? "Συνέχισε τη μέρα" : "Ξεκίνα τη μέρα μου"}</b><small>${started ? `${doneN} από ${plural(todayShops.length, "επίσκεψη", "επισκέψεις")} έγιναν` : "Ο Jarvis φτιάχνει τη διαδρομή με τις προτεραιότητές σου"}</small></span><span class="chev">${ICON.chev}</span></button>` : ""}
+    ${canEdit() ? `<button class="jx-car" data-action="car">${CAR_ICON}<span>Λειτουργία αυτοκινήτου</span></button>` : ""}
   </section>
   <section class="jx-card jx-sched">
     <div class="jx-sched-head"><span class="jx-ic">${ic('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 14h2M12 14h2M8 17h2"/>')}</span><span class="grow"><b>Σήμερα</b><small>${todayShops.length ? `${doneN}/${todayShops.length} επισκέψεις` : "Καμία προγραμματισμένη επίσκεψη"}</small></span><a href="#route" class="link">Διαδρομή ›</a></div>
@@ -1070,6 +1082,10 @@ function viewSettings() {
     <div class="row-actions"><button class="btn" data-action="cal-export">Λήψη επισκέψεων & εργασιών (.ics)</button></div><p class="muted small">Το αρχείο .ics ανοίγει σε Google Calendar, Outlook ή iPhone και περνάει όλες τις προγραμματισμένες επισκέψεις και εργασίες.</p></section>` : "";
   return `${profile}${cal}<section class="section"><h2>Λογαριασμός</h2><div class="panel"><dl class="kv"><dt>Συνδεδεμένος ως</dt><dd>${esc(state.email || "")}</dd><dt>Συγχρονισμός</dt><dd>${esc(syncText())}</dd></dl></div></section>
   <section class="section"><h2>Γλώσσα φωνής</h2><div class="chips">${vchip("el-GR", "Ελληνικά")}${vchip("en-US", "English")}</div><p class="muted small">Η γλώσσα που ακούει το μικρόφωνο του Talk. Ο Jarvis καταλαβαίνει και τις δύο.</p></section>
+  <section class="section"><h2>«Hey Siri, Jarvis»</h2><div class="panel siri-steps"><p class="small">Με μία φράση ο Jarvis ανοίγει σε λειτουργία αυτοκινήτου, με την ερώτησή σου ήδη σταλμένη. Φτιάξε μία φορά τη συντόμευση:</p>
+    <ol class="small"><li>Άνοιξε την εφαρμογή <b>Συντομεύσεις</b> (Shortcuts) και πάτα <b>+</b>.</li><li>Πρόσθεσε <b>Υπαγόρευση κειμένου</b> (Dictate Text), γλώσσα Ελληνικά.</li><li>Πρόσθεσε <b>Κωδικοποίηση URL</b> (URL Encode).</li><li>Πρόσθεσε <b>Άνοιγμα URL</b> (Open URL) με αυτή τη διεύθυνση και στο τέλος το αποτέλεσμα της κωδικοποίησης:<code class="siri-url">${esc(location.origin + location.pathname)}#car?q=</code></li><li>Ονόμασε τη συντόμευση <b>Jarvis</b>.</li></ol>
+    <p class="small">Μετά πες <b>«Hey Siri, Jarvis»</b>, πες την ερώτησή σου, και ο Jarvis θα σου απαντήσει φωναχτά. Την πρώτη φορά συνδέσου στο Safari και επίτρεψε το μικρόφωνο (Ρυθμίσεις → Safari → Μικρόφωνο → Να επιτρέπεται).</p>
+    <div class="row-actions"><button class="btn small" data-action="copy-car-link">Αντιγραφή διεύθυνσης</button><button class="btn small" data-action="car">Δοκίμασε τη λειτουργία αυτοκινήτου</button></div></div></section>
   <section class="section"><h2>Αντίγραφο ασφαλείας</h2><p class="muted small">Κατέβασε όλα τα δεδομένα (μαγαζιά, εργασίες, επισκέψεις, καταλόγους) σε ένα αρχείο. Οι φωτογραφίες μένουν στον ιδιωτικό σου χώρο.</p><div class="row-actions"><button class="btn" data-action="backup">Λήψη αντιγράφου</button></div></section>
   <div class="row-actions"><button class="btn danger" data-action="sign-out">Αποσύνδεση</button></div>`;
 }
@@ -1439,6 +1455,8 @@ async function onAction(ev) {
   }
   else if (a === "go") { ev.preventDefault(); nav(el.dataset.v); }
   else if (a === "talk") openTalk();
+  else if (a === "car") openCar();
+  else if (a === "copy-car-link") { const u = location.origin + location.pathname + "#car?q="; (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject()).then(() => toast("Αντιγράφηκε ✓"), () => toast(u)); }
   else if (a === "route-toggle") { const R = routeState(), id = el.dataset.id; R.ids = R.ids.includes(id) ? R.ids.filter((x) => x !== id) : [...R.ids, id]; saveRoute(); render(); }
   else if (a === "route-move") { const R = routeState(); const cur = [...app.querySelectorAll(".stops [data-action='route-move'][data-v='1']")].map((b) => b.dataset.id); const i = cur.indexOf(el.dataset.id), j = i + Number(el.dataset.v); if (i < 0 || j < 0 || j >= cur.length) return; [cur[i], cur[j]] = [cur[j], cur[i]]; R.ids = cur; R.manual = true; saveRoute(); render(); }
   else if (a === "route-auto") { routeState().manual = false; saveRoute(); render(); }
@@ -1765,12 +1783,12 @@ function digest(full, curId = null) {
     return d;
   });
 }
-function talkPrompt(text) {
+function talkPrompt(text, opts = {}) {
   const cur = state.shopId && state.shopId !== "new" ? shopById(state.shopId) : null;
   const companies = [...new Set(state.catalogues.map((c) => c.company))];
   const brandMap = Object.entries(brandIndex()).slice(0, 400).map(([b, v]) => `${b} = ${v.company}`).join("; ");
   const openTasks = state.tasks.filter((t) => !t.done).map((t) => ({ id: "t:" + t.id, title: t.title, due: t.due, shop: (shopById(t.shopId) || {}).name || "", shopId: t.shopId ? "s:" + t.shopId : "" }));
-  const hist = (state.talk && state.talk.history || []).map((h) => `Rep: ${h.q}\nJarvis: ${h.a}`).join("\n\n");
+  const hist = (opts.history || (state.talk && state.talk.history) || []).map((h) => `Rep: ${h.q}\nJarvis: ${h.a}`).join("\n\n");
   return `You are Jarvis, the field assistant of a HoReCa sales rep in Greece who visits cafés, bars, restaurants and hotels. The rep just spoke (dictated, so expect typos, Greek names in Latin or Greek letters, and loose phrasing). Today is ${todayISO()}.
 ${state.here && Date.now() - state.here.at < 10 * 60000 ? `The rep's phone GPS says they are at ${state.here.lat.toFixed(5)}, ${state.here.lng.toFixed(5)}. Shops with lat/lng nearby (under ~80 m) are likely the one they mean if they don't name it.` : ""}
 ${cur ? `The rep currently has this shop open, so assume they mean it unless they name another: ${cur.name} (id ${cur.id}).` : ""}
@@ -1810,7 +1828,8 @@ Reply with only one JSON object of this shape (omit empty fields):
 }
 Write "answer", "summary", visit notes and task titles in Greek, unless the rep spoke English. Keep the field names and the type/category values exactly as listed (in English).
 Shop ids in your reply ("shopId", actions) are the plain id without the "s:" prefix.
-Rules: an answer must only state facts found in the records, and "sources" must list every record used (never invent ids). When the rep asks what to do, for suggestions or follow-ups, put them in "actions"; never say you changed anything, the rep approves first. If the rep describes having been at a shop, include "visit". Turn every promise or follow-up into a task with a due date when one is implied ("next week" = 7 days from today). Only include things the rep actually said; never invent serial numbers, prices or names. Use the company from the brand map when you know it. Resolve relative dates against today.
+${opts.car ? `CAR MODE: the rep is driving and will only HEAR your reply, read aloud by the phone. Write "answer" and "summary" as natural speech: at most 3 short sentences, no lists, no bullets, no symbols, no ids, dates as words (e.g. "την Τρίτη 4 Νοεμβρίου"). For a visit preparation give only the 2 or 3 things that matter most. Updates still go in the fields as usual.
+` : ""}Rules: an answer must only state facts found in the records, and "sources" must list every record used (never invent ids). When the rep asks what to do, for suggestions or follow-ups, put them in "actions"; never say you changed anything, the rep approves first. If the rep describes having been at a shop, include "visit". Turn every promise or follow-up into a task with a due date when one is implied ("next week" = 7 days from today). Only include things the rep actually said; never invent serial numbers, prices or names. Use the company from the brand map when you know it. Resolve relative dates against today.
 
 The rep said:
 """${text}"""`;
@@ -1852,18 +1871,20 @@ function talkPresets() {
     : [["Τι να κάνω σήμερα;", "Τι να κάνω σήμερα; Ποιους πελάτες να δω πρώτα και γιατί;"], ["Εκκρεμότητες εβδομάδας", "Ποιες εκκρεμότητες έχω αυτή την εβδομάδα;"], ["Ποια προϊόντα λείπουν;", "Ποια προϊόντα λείπουν από τους πελάτες μου;"], ["Ποιοι κινδυνεύουν;", "Ποιοι πελάτες κινδυνεύουν ή έχουν πέσει;"], ["Πρότεινε follow-ups", "Πρότεινε follow-ups για τις εκκρεμότητές μου."]];
   return `<div class="talk-quick" role="group" aria-label="Γρήγορες ερωτήσεις">${P.map(([l, q]) => `<button class="chip" data-talk="preset" data-q="${esc(q)}">${esc(l)}</button>`).join("")}</div>`;
 }
+/* Saves approved follow-ups from an answer: tasks, next visits, notes. */
+async function applyActions(pick) {
+  const stamp = new Date().toISOString();
+  for (const x of pick) {
+    if (x.type === "task") await state.db.collection("tasks").doc().set({ title: x.title, due: isDate(x.due) ? x.due : "", shopId: shopById(x.shopId) ? x.shopId : "", done: false, createdAt: stamp });
+    else if (x.type === "nextVisit") await state.db.doc("shops/" + x.shopId).update({ nextVisit: x.date, updatedAt: stamp });
+    else if (x.type === "note") { const sh = shopById(x.shopId); await state.db.doc("shops/" + x.shopId).update({ insideInfo: [sh.insideInfo, `${todayISO()}: ${x.text}`].filter(Boolean).join("\n"), updatedAt: stamp }); }
+  }
+}
 async function talkApply() {
   const t = state.talk, acts = talkActions(t.result);
   const pick = [...talkRoot.querySelectorAll("[data-act]")].filter((b) => b.checked).map((b) => acts[Number(b.dataset.act)]);
   if (!pick.length) return;
-  const stamp = new Date().toISOString();
-  const ok = await guarded(async () => {
-    for (const x of pick) {
-      if (x.type === "task") await state.db.collection("tasks").doc().set({ title: x.title, due: isDate(x.due) ? x.due : "", shopId: shopById(x.shopId) ? x.shopId : "", done: false, createdAt: stamp });
-      else if (x.type === "nextVisit") await state.db.doc("shops/" + x.shopId).update({ nextVisit: x.date, updatedAt: stamp });
-      else if (x.type === "note") { const sh = shopById(x.shopId); await state.db.doc("shops/" + x.shopId).update({ insideInfo: [sh.insideInfo, `${todayISO()}: ${x.text}`].filter(Boolean).join("\n"), updatedAt: stamp }); }
-    }
-  });
+  const ok = await guarded(() => applyActions(pick));
   t.applied = ok ? plural(pick.length, "αλλαγή αποθηκεύτηκε", "αλλαγές αποθηκεύτηκαν") : "";
   t.error = ok ? "" : "Δεν αποθηκεύτηκε. Έλεγξε τη σύνδεση και δοκίμασε ξανά.";
   renderTalk();
@@ -1880,7 +1901,7 @@ function renderTalk() {
     ${src.length ? `<div class="sources"><span class="eyebrow">Από τις καταχωρίσεις σου</span><ul>${src.map((x) => `<li><button class="src" data-talk="src" data-id="${esc(x.shopId)}" data-tab="${x.tab}"><b>${esc(x.label)}</b>${x.sub ? `<small>${esc(x.sub)}</small>` : ""}</button></li>`).join("")}</ul></div>` : `<p class="muted small">Δεν αναφέρθηκε συγκεκριμένη καταχώριση. Έλεγξε την απάντηση πριν βασιστείς σε αυτή.</p>`}
     ${acts.length ? `<div class="panel"><div class="inline-form"><h3>Προτεινόμενες ενέργειες</h3><p class="muted small">Δεν αλλάζει τίποτα μέχρι να εγκρίνεις.</p><ul class="list acts">${acts.map((x, i) => `<li class="item"><input type="checkbox" class="check" id="act-${i}" data-act="${i}" ${t.applied ? "disabled" : "checked"}><label for="act-${i}" class="grow"><div class="title">${esc(actLabel(x))}</div><div class="sub">${esc(x.shopId && shopById(x.shopId) ? shopById(x.shopId).name : "Χωρίς μαγαζί")}</div></label></li>`).join("")}</ul>${t.applied ? `<p class="ok-text small" role="status">${esc(t.applied)} ✓</p>` : `<div class="row-actions"><button class="btn primary" data-talk="apply">Έγκριση επιλεγμένων</button></div>`}</div></div>` : ""}
     ${t.error ? `<div class="banner" role="alert">${esc(t.error)}</div>` : ""}
-    <div class="row-actions"><button class="btn primary" data-talk="again">Ρώτα κάτι άλλο</button><button class="btn" data-talk="close">Τέλος</button></div>`;
+    <div class="row-actions">${TTS ? `<button class="btn" data-talk="speak">Διάβασέ το</button>` : ""}<button class="btn primary" data-talk="again">Ρώτα κάτι άλλο</button><button class="btn" data-talk="close">Τέλος</button></div>`;
   }
   else if (t.result) {
     const lines = changeLines(t.result);
@@ -1888,7 +1909,7 @@ function renderTalk() {
       <div class="panel"><ul class="change-list">${lines.length ? lines.map(([k, v]) => `<li><b>${esc(k)}</b><span>${esc(v)}</span></li>`).join("") : `<li>Δεν υπάρχει κάτι να αποθηκευτεί. Δοκίμασε ξανά λέγοντας το όνομα του μαγαζιού και τι έγινε.</li>`}</ul></div>
       ${!t.result.shopId && !t.result.newShop && lines.length ? `<div class="banner">Δεν κατάλαβα ποιο μαγαζί είναι. Πες το όνομα του μαγαζιού και δοκίμασε ξανά.</div>` : ""}
       <div class="row-actions">${lines.length && (t.result.shopId || t.result.newShop) ? `<button class="btn primary" data-talk="save">Αποθήκευση όλων</button>` : ""}<button class="btn" data-talk="again">Αλλαγή</button><button class="btn" data-talk="close">Απόρριψη</button></div>`;
-  } else body = `${talkPresets()}${Rec ? `<button class="mic-btn ${t.listening ? "on" : ""}" data-talk="mic" aria-pressed="${!!t.listening}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-2.1A7 7 0 0 0 19 12z"/></svg>${t.listening ? "Σε ακούω… πάτα για τέλος" : "Πάτα και μίλα"}</button>` : ""}
+  } else body = `<button class="car-entry" data-talk="car">${CAR_ICON}<span><b>Λειτουργία αυτοκινήτου</b><small>Ο Jarvis μιλάει και σε ακούει, χωρίς να αγγίζεις το κινητό</small></span></button>${talkPresets()}${Rec ? `<button class="mic-btn ${t.listening ? "on" : ""}" data-talk="mic" aria-pressed="${!!t.listening}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-2.1A7 7 0 0 0 19 12z"/></svg>${t.listening ? "Σε ακούω… πάτα για τέλος" : "Πάτα και μίλα"}</button>` : ""}
     <label class="field" for="talk-text">${Rec ? "Ή γράψε. " : "Πάτα το μικρόφωνο στο πληκτρολόγιο και μίλα. "}Πες το όνομα του μαγαζιού, τι έγινε, τι έχουν και τι υποσχέθηκες.</label>
     <textarea id="talk-text" placeholder="π.χ. Μόλις έφυγα από την Ταβέρνα Θάλασσα στο Θησείο. Είδα τη Μαρία, την υπεύθυνη, το κινητό της είναι 694… Παρήγγειλαν 20 βαρέλια. Οι ομπρέλες μας είναι σκισμένες, θέλουν 4 καινούργιες την επόμενη εβδομάδα.">${esc(t.text || "")}</textarea>
     ${t.error ? `<div class="banner" role="alert">${esc(t.error)}</div>` : ""}
@@ -1990,11 +2011,209 @@ talkRoot.addEventListener("click", (ev) => {
   else if (a === "preset") { const ta = document.getElementById("talk-text"); if (ta) ta.value = b.dataset.q; talkSend(); }
   else if (a === "apply") { b.disabled = true; b.textContent = "Αποθήκευση…"; talkApply(); }
   else if (a === "src") { const id = b.dataset.id; if (id && shopById(id)) { state.talk = null; renderTalk(); openShop(id, { tab: b.dataset.tab }); } }
-  else if (a === "close") { if (rec && state.talk.listening) rec.stop(); state.talk = null; renderTalk(); }
+  else if (a === "close") { if (rec && state.talk.listening) rec.stop(); TTS && TTS.cancel(); state.talk = null; renderTalk(); }
+  else if (a === "car") openCar();
+  else if (a === "speak") speakOnce(state.talk.result && state.talk.result.answer);
   else if (a === "save") { b.disabled = true; talkSave(); }
 });
 function openTalk() { state.talk = { open: true, text: "" }; renderTalk(); locate().catch(() => {}); }
 document.getElementById("fab").addEventListener("click", openTalk);
+
+/* ---------- car mode: hands-free; Jarvis speaks its answers and listens again ---------- */
+const carRoot = document.createElement("div"); carRoot.id = "car-root"; document.body.appendChild(carRoot);
+const TTS = window.speechSynthesis || null;
+let car = null, carRec = null, carLock = null, carTimer = null;
+const CAR_YES = /^(ναι|οκ|οκει|ok|okay|ενταξει|σωστα|αποθηκευσε|σωσε|βεβαιως|φυσικα|μαλιστα|yes|yeah|yep|save|παμε|κανε το|ανοιξε|θελω)(?=\s|$)/;
+const CAR_NO = /^(οχι|ακυρο|ακυρωσε|ασ το|ασε|μην|no|nope|cancel|αλλαξε|τιποτα)(?=\s|$)/;
+const carClean = (raw) => norm(raw).replace(/[.,!;?·«»"':]/g, " ").replace(/\s+/g, " ").trim().replace(/^(hey |hei |ει |ε )?(jarvis|τζαρβις|τζαρβης|ζαρβις|τζαρβι)(?=\s|$) ?/, "").trim();
+function carVoice() {
+  if (!TTS) return null;
+  const L = state.voiceLang.toLowerCase(), v = TTS.getVoices();
+  return v.find((x) => x.lang.toLowerCase().replace("_", "-") === L) || v.find((x) => x.lang.toLowerCase().startsWith(L.slice(0, 2))) || null;
+}
+/* Speaks text in short sentences (long utterances get cut off on some phones), then calls next (default: listen again).
+   If the phone blocks speech until a tap (iPhone, when opened from a link), shows a big "tap to hear" instead. */
+function carSay(text, next) {
+  if (!car) return;
+  clearTimeout(carTimer);
+  const id = car.sayId = (car.sayId || 0) + 1;
+  car.said = text; car.phase = "speaking"; car.next = next || null; renderCar();
+  const done = () => { if (!car || car.sayId !== id) return; car.sayId++; clearTimeout(carTimer); (next || carListen)(); };
+  if (!TTS || !text) { carTimer = setTimeout(done, Math.min(9000, 1500 + String(text).length * 50)); return; }
+  TTS.cancel();
+  const parts = String(text).replace(/\s+/g, " ").match(/[^.!;?…]+[.!;?…]*\s*/g) || [String(text)];
+  const voice = carVoice(); let started = false;
+  const locked = () => { if (!car || car.sayId !== id || started) return; clearTimeout(carTimer); TTS.cancel(); car.phase = "tap"; renderCar(); };
+  parts.forEach((p, i) => {
+    const u = new SpeechSynthesisUtterance(p.trim()); u.lang = state.voiceLang; if (voice) u.voice = voice; u.rate = 1.03;
+    u.onstart = () => { started = true; car && (car.ttsOk = true); };
+    if (i === parts.length - 1) { u.onend = () => setTimeout(done, 250); u.onerror = (e) => { if (e.error === "not-allowed") locked(); else setTimeout(done, 250); }; }
+    TTS.speak(u);
+  });
+  if (!car.ttsOk) setTimeout(locked, 1800);
+  carTimer = setTimeout(done, 4000 + String(text).length * 110); // backstop if the phone never reports the end
+}
+function carListen() {
+  if (!car) return;
+  clearTimeout(carTimer);
+  if (!Rec) { car.phase = "type"; renderCar(); return; }
+  if (document.hidden) { car.phase = "idle"; renderCar(); return; }
+  let finalText = "", interim = "", err = "";
+  try { carRec = new Rec(); carRec.lang = state.voiceLang; carRec.continuous = false; carRec.interimResults = true; }
+  catch { car.phase = "type"; car.note = MIC_ERRORS["service-not-allowed"]; renderCar(); return; }
+  const r = carRec;
+  r.onresult = (e) => { interim = ""; for (let i = e.resultIndex; i < e.results.length; i++) { if (e.results[i].isFinal) finalText += e.results[i][0].transcript + " "; else interim += e.results[i][0].transcript; } car.heard = (finalText + interim).trim(); const h = document.getElementById("car-heard"); if (h) h.textContent = car.heard; };
+  r.onerror = (e) => { err = e.error; };
+  r.onend = () => {
+    if (carRec === r) carRec = null;
+    if (!car || car.phase !== "listening") return;
+    const text = (finalText || interim).trim();
+    if (text) { car.quiet = 0; carHandle(text); return; }
+    if (err === "service-not-allowed" || err === "language-not-supported") { car.phase = "type"; car.note = MIC_ERRORS[err]; renderCar(); return; }
+    if (err === "not-allowed" || err === "audio-capture" || err === "network") { car.phase = "idle"; car.note = err === "not-allowed" ? "Πάτα τον κύκλο για να σε ακούσω. Αν σε ρωτήσει, επίτρεψε το μικρόφωνο." : MIC_ERRORS[err]; renderCar(); return; }
+    car.quiet = (car.quiet || 0) + 1;
+    if (car.quiet < 3) carListen(); else { car.quiet = 0; car.phase = "idle"; renderCar(); }
+  };
+  car.phase = "listening"; car.heard = ""; car.note = ""; renderCar();
+  try { r.start(); } catch { car.phase = "idle"; renderCar(); }
+}
+function carHandle(raw) {
+  if (!car) return;
+  const t = carClean(raw);
+  car.heard = raw;
+  if (!t) { carSay("Ναι; Σε ακούω."); return; }
+  const P = car.pending;
+  if (P) {
+    car.pending = null;
+    if (CAR_YES.test(t)) { carConfirm(P); return; }
+    if (CAR_NO.test(t)) { carSay(P.kind === "nav" ? "Εντάξει." : "Εντάξει, δεν αποθήκευσα τίποτα."); return; }
+  }
+  if (/^(τελος|σταματα|εξοδος|κλεισε|βγες|stop|exit|bye|αντιο)( \S+){0,2}$/.test(t)) { carSay("Καλό δρόμο.", closeCar); return; }
+  if (/^(ξανα|επαναλαβε|πες (το|τα) ξανα|τι ειπες|repeat)/.test(t)) { carSay(car.lastAnswer || "Δεν έχω πει κάτι ακόμα."); return; }
+  if (/(επομεν\S* (σταση|επισκεψη|μαγαζι|πελατ\S*)|ποι\S* ειναι (ο|το|η) επομεν|που πα(με|ω) (μετα|τωρα)|next stop)/.test(t)) { carNext(); return; }
+  if (/^(οδηγιες|πλοηγηση|directions|navigate)/.test(t) && car.navShop) { carNav(car.navShop); return; }
+  carAsk(raw);
+}
+function carNext() {
+  const R = routeState(), done = visitedOn(todayISO());
+  const chosen = R.ids.map(shopById).filter(Boolean);
+  const here = state.here && Date.now() - state.here.at < 30 * 60000 ? state.here : null;
+  const stops = R.manual ? chosen : orderStops(chosen.filter(hasGeo), here).concat(chosen.filter((s) => !hasGeo(s)));
+  const s = stops.find((x) => !done.has(x.id));
+  if (!s) { carSay(chosen.length ? "Έκανες όλες τις στάσεις της διαδρομής σου. Μπράβο!" : "Δεν έχεις διαδρομή για σήμερα. Ρώτα με «ποιους να δω σήμερα» ή πάτα «Ξεκίνα τη μέρα μου» στην αρχική."); return; }
+  const n = nextActionOf(s), c = mainContact(s), lo = lastOrder(s);
+  const say = [`Επόμενη στάση: ${s.name}${s.area ? ", " + s.area : ""}.`, c && c.name ? `Θα δεις ${c.name}.` : "", n && n.text !== "Επίσκεψη" ? `${n.late ? "Εκπρόθεσμο" : "Εκκρεμεί"}: ${n.text}.` : "", lo ? `Τελευταία παραγγελία: ${orderText(lo)}.` : ""].filter(Boolean).join(" ");
+  car.navShop = s; car.pending = { kind: "nav", shop: s }; car.lastAnswer = say;
+  carSay(say + " Να ανοίξω οδηγίες;");
+}
+function carNav(s) {
+  car.navShop = s;
+  let w = null; try { w = window.open(mapsDir(s), "_blank", "noopener"); } catch {}
+  if (w === null) carSay("Πάτα το κουμπί Οδηγίες στην οθόνη.", () => { car.phase = "idle"; renderCar(); });
+  else { car.phase = "idle"; renderCar(); }
+}
+async function carConfirm(P) {
+  if (P.kind === "nav") { carNav(P.shop); return; }
+  car.phase = "thinking"; renderCar();
+  try {
+    if (P.kind === "update") await applyUpdate(P.result, new Date().toISOString());
+    else await applyActions(P.actions);
+    carSay(P.kind === "update" ? "Αποθηκεύτηκε." : "Έγινε, τα αποθήκευσα.");
+  } catch { carSay("Δεν αποθηκεύτηκε. Έλεγξε τη σύνδεση και πες το ξανά."); }
+}
+async function carAsk(text) {
+  car.phase = "thinking"; car.asked = text; car.navShop = null; renderCar();
+  const ctl = car.ctl = new AbortController();
+  let r;
+  try { r = await state.sample.json(talkPrompt(text, { car: true, history: car.history }), { signal: ctl.signal, cache: false }); if (!r || typeof r !== "object") throw { code: "invalid_json" }; }
+  catch (e) { if (car && car.ctl === ctl && !(e && e.code === "cancelled")) carSay(sampleErr(e)); return; }
+  if (!car || car.ctl !== ctl) return;
+  r.shopId = plainId(r.shopId) || null; if (r.shopId && !shopById(r.shopId)) r.shopId = null;
+  if (r.kind === "answer") {
+    const ans = r.answer || "Δεν βρήκα απάντηση στα δεδομένα σου.";
+    car.history = [...car.history, { q: text, a: clip(ans, 600) }].slice(-4);
+    car.lastAnswer = ans;
+    const acts = talkActions(r);
+    if (acts.length) { car.pending = { kind: "actions", actions: acts }; carSay(`${ans} Προτείνω: ${acts.map(actLabel).join(". ")}. Να τα αποθηκεύσω;`); }
+    else carSay(ans);
+    return;
+  }
+  const lines = changeLines(r);
+  if (lines.length < 2) { carSay("Δεν βρήκα κάτι να αποθηκεύσω. Πες το όνομα του μαγαζιού και τι έγινε."); return; }
+  if (!r.shopId && !r.newShop) { carSay("Δεν κατάλαβα για ποιο μαγαζί μιλάς. Πες το ξανά με το όνομα του μαγαζιού."); return; }
+  const who = r.newShop ? `Νέο μαγαζί ${r.newShop.name}` : shopById(r.shopId).name;
+  const sum = r.summary || `Θα αποθηκεύσω ${plural(lines.length - 1, "αλλαγή", "αλλαγές")}.`;
+  car.pending = { kind: "update", result: r, lines };
+  car.lastAnswer = r.summary ? sum : `${who}. ${sum}`;
+  carSay(car.lastAnswer + " Να το αποθηκεύσω;");
+}
+function carStop() { if (!car) return; car.sayId = (car.sayId || 0) + 1; clearTimeout(carTimer); TTS && TTS.cancel(); const r = carRec; carRec = null; try { r && r.abort(); } catch {} }
+function openCar(opts = {}) {
+  if (car) { if (opts.q) { carStop(); carAsk(opts.q); } return; }
+  if (state.talk) { if (rec && state.talk.listening) rec.stop(); state.talk = null; renderTalk(); }
+  car = { phase: "idle", history: [], heard: "", said: "", pending: null, quiet: 0, note: "" };
+  document.body.classList.add("car-on");
+  carWake();
+  locate().catch(() => {});
+  if (opts.q) { car.heard = opts.q; carAsk(opts.q); }
+  else if (opts.fromLink) carListen();
+  else carSay(`Είμαι εδώ${state.settings.myName ? ", " + state.settings.myName : ""}. Πες μου.`);
+}
+function carWake() { try { navigator.wakeLock && navigator.wakeLock.request("screen").then((l) => { carLock = l; }).catch(() => {}); } catch {} }
+function closeCar() {
+  if (!car) return;
+  const c = car; carStop(); car = null; c.ctl && c.ctl.abort();
+  try { carLock && carLock.release(); } catch {} carLock = null;
+  document.body.classList.remove("car-on"); carRoot.innerHTML = "";
+}
+document.addEventListener("visibilitychange", () => {
+  if (!car) return;
+  if (document.hidden) { const p = car.phase; carStop(); if (p !== "thinking") { car.phase = "idle"; renderCar(); } }
+  else { carWake(); renderCar(); }
+});
+const CAR_LABEL = { idle: "Πάτα για να μιλήσεις", listening: "Σε ακούω…", thinking: "Σκέφτομαι…", speaking: "Μιλάω · πάτα για να με διακόψεις", tap: "Πάτα για να ακούσεις την απάντηση", type: "Γράψε ή πάτα το 🎤 του πληκτρολογίου" };
+function renderCar() {
+  if (!car) { carRoot.innerHTML = ""; return; }
+  const ph = car.phase, P = car.pending, keep = document.getElementById("car-text");
+  const typed = keep ? keep.value : "";
+  carRoot.innerHTML = `<div class="car${P && P.kind !== "nav" ? " has-p" : ""}" role="dialog" aria-label="Λειτουργία αυτοκινήτου">
+    <div class="car-top"><span class="car-title">${CAR_ICON}<b>Λειτουργία αυτοκινήτου</b></span><button class="car-x" data-car="close">Τέλος</button></div>
+    <div class="car-main">
+      ${car.asked && (ph === "thinking" || car.said) ? `<p class="car-asked">«${esc(clip(car.asked, 160))}»</p>` : ""}
+      <div class="car-said" aria-live="polite">${ph === "thinking" ? "" : car.said ? esc(car.said) : `Πες π.χ. «Ποια είναι η επόμενη στάση;», «Τι εκκρεμότητες έχω;» ή «Μόλις έφυγα από…»`}</div>
+      ${P && P.kind === "update" ? `<ul class="change-list car-lines">${P.lines.map(([k, v]) => `<li><b>${esc(k)}</b><span>${esc(clip(v, 140))}</span></li>`).join("")}</ul>` : ""}
+      ${P && P.kind !== "nav" ? `<div class="car-yn"><button class="btn primary" data-car="yes">Ναι, αποθήκευσε</button><button class="btn" data-car="no">Όχι</button></div>` : ""}
+      ${car.navShop ? `<a class="btn car-nav" href="${esc(mapsDir(car.navShop))}" target="_blank" rel="noopener">${ICON.route}<span>Οδηγίες προς ${esc(car.navShop.name)}</span></a>` : ""}
+    </div>
+    <div class="car-ctl">
+      <button class="car-orb ${ph}" data-car="orb" aria-label="${CAR_LABEL[ph]}"><span class="ring"></span><span class="core">${ph === "speaking" || ph === "tap" ? ic('<path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/>') : ICON.mic}</span></button>
+      <p class="car-state">${CAR_LABEL[ph]}</p>
+      <p class="car-heard" id="car-heard">${ph === "listening" ? esc(car.heard || "") : ""}</p>
+      ${car.note ? `<p class="car-note" role="alert">${esc(car.note)}</p>` : ""}
+      ${ph === "type" ? `<div class="car-type"><textarea id="car-text" rows="2" placeholder="Πάτα εδώ και μετά το 🎤 του πληκτρολογίου">${esc(typed)}</textarea><button class="btn primary" data-car="send">Στείλε</button></div>` : ""}
+      <p class="car-hint">«επόμενη στάση» · «επανάλαβε» · «τέλος»</p>
+    </div></div>`;
+}
+carRoot.addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-car]"); if (!b || !car) return;
+  const a = b.dataset.car;
+  if (a === "close") closeCar();
+  else if (a === "orb") {
+    if (car.phase === "listening") { try { carRec && carRec.stop(); } catch {} }
+    else if (car.phase === "thinking") { car.ctl && car.ctl.abort(); car.ctl = null; car.phase = "idle"; renderCar(); }
+    else if (car.phase === "tap") { car.ttsOk = true; carSay(car.said, car.next); }
+    else if (car.phase === "type") { const ta = document.getElementById("car-text"); ta && ta.focus(); }
+    else { carStop(); car.note = ""; carListen(); }
+  }
+  else if (a === "yes" || a === "no") { const P = car.pending; car.pending = null; carStop(); car.phase = "thinking"; if (!P) return; if (a === "yes") carConfirm(P); else carSay("Εντάξει, δεν αποθήκευσα τίποτα."); }
+  else if (a === "send") { const ta = document.getElementById("car-text"); const v = ta && ta.value.trim(); if (v) { ta.value = ""; carHandle(v); } }
+});
+/* Read an answer aloud from the normal Talk sheet. */
+function speakOnce(text) {
+  if (!TTS || !text) return;
+  TTS.cancel(); const voice = carVoice();
+  (String(text).replace(/\s+/g, " ").match(/[^.!;?…]+[.!;?…]*\s*/g) || [text]).forEach((p) => { const u = new SpeechSynthesisUtterance(p.trim()); u.lang = state.voiceLang; if (voice) u.voice = voice; TTS.speak(u); });
+}
 
 /* read labels / catalogue pages from photos */
 async function readPhotos(kind) {
@@ -2046,6 +2265,7 @@ async function startApp(session) {
   try { state.cal = JSON.parse(localStorage.getItem("jarvis-cal") || "null"); } catch {}
   routeFromHash();
   showWelcome();
+  if (state.carPending) { const o = state.carPending; state.carPending = null; openCar(o); }
   const db = state.db;
   db.collection("shops").onSnapshot((snap) => { state.shops = snap.docs.map(clean); state.loaded.shops = true; safeRender(); });
   db.collection("tasks").onSnapshot((snap) => { state.tasks = snap.docs.map(clean); state.loaded.tasks = true; safeRender(); });

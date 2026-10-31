@@ -779,3 +779,51 @@ td .trend { margin-left: 4px; font-size: 11px; padding: 1px 6px; }
 .sheet > * { flex-shrink: 0; }
 .toast { left: 16px; right: 16px; margin: 0 auto; width: fit-content; max-width: 420px; transform: translateY(20px); }
 .toast.on { transform: translateY(0); }
+
+/* ===== car mode ===== */
+.jx-car { align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 99px; border: 1px solid rgba(34, 211, 238, 0.45); background: rgba(5, 14, 26, 0.55); color: #CFFAFE; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.jx-car svg, .car-entry svg, .car-title svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.car-entry { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid rgba(34, 211, 238, 0.4); background: var(--cyan-soft, rgba(34, 211, 238, 0.12)); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.car-entry svg { width: 28px; height: 28px; color: #67E8F9; }
+.car-entry span { display: flex; flex-direction: column; gap: 2px; }
+.car-entry small { color: var(--muted); font-size: 13px; }
+body.car-on { overflow: hidden; }
+.car { position: fixed; inset: 0; z-index: 45; display: flex; flex-direction: column; color: #E6F6FA; background: radial-gradient(120% 70% at 50% 100%, #0B2A3D 0%, #050E1A 60%); padding: calc(12px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.car-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.car-title { display: inline-flex; align-items: center; gap: 8px; color: #67E8F9; font-size: 15px; }
+.car-x { min-height: 44px; padding: 0 18px; border-radius: 99px; border: 1px solid rgba(255, 255, 255, 0.25); background: transparent; color: inherit; font: inherit; font-weight: 700; font-size: 16px; cursor: pointer; }
+.car-main { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding: 18px 0 8px; }
+.car-asked { margin: 0; color: #8FB3C2; font-size: 15px; }
+.car-said { font-size: clamp(22px, 6.4vw, 30px); line-height: 1.35; font-weight: 600; white-space: pre-wrap; overflow-wrap: anywhere; }
+.car-lines { background: rgba(255, 255, 255, 0.05); border-radius: 14px; padding: 6px 12px; }
+.car-lines li span { color: #CFE3EA; }
+.car-yn { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.car-yn .btn, .car-nav { min-height: 56px; font-size: 18px; justify-content: center; }
+.car-nav { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.car-nav svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; }
+.car-ctl { display: flex; flex-direction: column; align-items: center; gap: 8px; flex: none; }
+.car-orb { position: relative; width: 148px; height: 148px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; background: radial-gradient(circle at 50% 40%, #155E75, #072235 70%); box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.5), 0 0 40px rgba(34, 211, 238, 0.35); color: #A5F3FC; display: grid; place-items: center; }
+.car-orb .core svg { width: 56px; height: 56px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.car-orb .ring { position: absolute; inset: -10px; border-radius: 50%; border: 2px solid rgba(34, 211, 238, 0.35); }
+.car-orb.listening { background: radial-gradient(circle at 50% 40%, #22D3EE, #0E7490 70%); color: #03222B; }
+.car-orb.listening .ring { animation: car-pulse 1.3s ease-out infinite; }
+.car-orb.thinking .ring { border-color: transparent; border-top-color: #67E8F9; animation: car-spin 0.9s linear infinite; }
+.car-orb.speaking .ring { animation: car-pulse 2s ease-in-out infinite; }
+.car-orb.tap { background: radial-gradient(circle at 50% 40%, #F0B640, #9A6A10 70%); color: #261A00; box-shadow: 0 0 40px rgba(240, 182, 64, 0.45); }
+@keyframes car-pulse { 0% { transform: scale(1); opacity: 0.9; } 100% { transform: scale(1.25); opacity: 0; } }
+@keyframes car-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .car-orb .ring { animation: none !important; } }
+.car-state { margin: 4px 0 0; font-size: 17px; font-weight: 700; text-align: center; }
+.car-heard { margin: 0; min-height: 1.4em; color: #8FB3C2; text-align: center; font-size: 15px; max-width: 100%; overflow-wrap: anywhere; }
+.car-note { margin: 0; color: #FCD34D; text-align: center; font-size: 14px; }
+.car-type { display: flex; gap: 8px; width: 100%; }
+.car-type textarea { flex: 1; min-width: 0; font-size: 16px; border-radius: 12px; padding: 10px; }
+.car-hint { margin: 0; color: #6B8C9A; font-size: 13px; }
+.siri-steps ol { margin: 6px 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.siri-url { display: block; margin-top: 4px; padding: 6px 8px; border-radius: 8px; background: var(--sunk); overflow-wrap: anywhere; font-size: 12px; }
+@media (max-height: 640px) { .car-orb { width: 112px; height: 112px; } .car-orb .core svg { width: 44px; height: 44px; } }
+.car-ctl { padding-top: 14px; }
+.car.has-p .car-orb { width: 104px; height: 104px; }
+.car.has-p .car-orb .core svg { width: 40px; height: 40px; }
+.car.has-p .car-said { font-size: clamp(19px, 5.4vw, 24px); }
+.siri-steps { padding: 14px 16px; }
