@@ -429,7 +429,7 @@ header.top.home { background: var(--header-bg); }
   @keyframes wl-breathe { to { opacity: 0.7; } }
 }
 
-/* ===== J.A.R.V.I.S. theme: dark navy, glowing cyan (one look in every mode) ===== */
+/* ===== B1BLE theme: dark navy, glowing cyan (one look in every mode) ===== */
 html:root:root, html:root:root[data-theme] {
   --bg: #050E1A; --surface: #0A1A2B; --sunk: #0F2336; --ink: #E8F2FB; --muted: #8EA6BC; --line: #17324A;
   --brand: #22D3EE; --bar: #0E7490; --header-bg: #050E1A; --header-ink: #E8F2FB; --accent: #22D3EE; --accent-ink: #03222B;
@@ -438,7 +438,7 @@ html:root:root, html:root:root[data-theme] {
   --shadow: var(--glow); --cyan-soft: rgba(34, 211, 238, 0.12);
   --font-display: "Manrope", "Avenir Next", "Segoe UI", sans-serif;
   --font-body: "Manrope", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  /* Orbitron has no Greek, degree sign or dashes, so it shows boxes: keep it for the JARVIS wordmark only. */
+  /* Orbitron has no Greek, degree sign or dashes, so it shows boxes: keep it for the B1BLE wordmark only. */
   --font-hud: "Manrope", "Segoe UI", Roboto, sans-serif;
   --font-brand: "Orbitron", "Manrope", sans-serif;
   --font-data: "Manrope", "Segoe UI", Roboto, sans-serif;
@@ -733,7 +733,7 @@ fieldset.order-lines legend { font-size: 13px; color: var(--muted); padding: 0 4
 .toast { position: fixed; z-index: 30; left: 50%; bottom: calc(var(--nav-h) + 22px + env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 20px); max-width: calc(100% - 32px); padding: 10px 16px; border-radius: 14px; background: #0F2A40; color: #E8F2FB; border: 1px solid rgba(52, 211, 153, 0.5); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); font-size: 14px; font-weight: 600; opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s; }
 .toast.on { opacity: 1; transform: translate(-50%, 0); }
 
-/* Jarvis answers */
+/* B1ble answers */
 .talk-quick { display: flex; flex-wrap: wrap; gap: 8px; }
 .talk-quick .chip { white-space: normal; text-align: left; }
 .talk-q { margin: 0; }
