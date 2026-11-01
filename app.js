@@ -1308,7 +1308,7 @@ function tabConsumption(s) {
 
 function tabContacts(s) {
   const cs = s.contacts || [];
-  return `<div class="panel">${cs.length ? `<ul class="list">${cs.map((c, i) => `<li class="item"><span class="ph" aria-hidden="true">${esc((c.name || "?").charAt(0).toUpperCase())}</span><div class="grow"><div class="title">${esc(c.name)}${c.role ? ` <span class="muted small">${esc(c.role)}</span>` : ""}</div><div class="sub">${c.phone ? `<a href="tel:${esc(c.phone.replace(/\s/g, ""))}" class="num">${esc(c.phone)}</a>` : ""}${c.phone && c.email ? " · " : ""}${c.email ? `<span>${esc(c.email)}</span>` : ""}${c.notes ? `<div>${esc(c.notes)}</div>` : ""}</div></div>${rmButton(`shop:${s.id}:contacts:${i}`)}</li>`).join("")}</ul>` : `<div class="empty">Δεν υπάρχουν επαφές ακόμα.</div>`}</div>
+  return `<div class="panel">${cs.length ? `<ul class="list">${cs.map((c, i) => `<li class="item"><span class="ph" aria-hidden="true">${esc((c.name || "?").charAt(0).toUpperCase())}</span><div class="grow"><div class="title">${esc(c.name)}${c.role ? ` <span class="muted small">${esc(c.role)}</span>` : ""}</div><div class="sub">${c.phone ? `<a href="${esc(telHref(c.phone))}" class="num">${esc(c.phone)}</a>` : ""}${c.phone && c.email ? " · " : ""}${c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : ""}${c.notes ? `<div>${esc(c.notes)}</div>` : ""}</div></div>${rmButton(`shop:${s.id}:contacts:${i}`)}</li>`).join("")}</ul>` : `<div class="empty">Δεν υπάρχουν επαφές ακόμα.</div>`}</div>
   ${adder(`contact:${s.id}`, "Νέα επαφή", [{ name: "name", label: "Όνομα", required: true }, { name: "role", label: "Ρόλος", ph: "Ιδιοκτήτης, υπεύθυνος, bartender" }, { name: "phone", label: "Τηλέφωνο", type: "tel" }, { name: "email", label: "Email", type: "email" }, { name: "notes", label: "Σημειώσεις", ph: "Καλύτερη ώρα για τηλέφωνο, γενέθλια, προτιμήσεις" }], "Αποθήκευση")}`;
 }
 
@@ -1336,7 +1336,7 @@ function viewShop(s) {
     </div></div>
   <div class="actions4">
     <a class="act" href="${mapsDir(s)}" target="_blank" rel="noopener"><span class="act-ic">${ICON.nav}</span>Οδηγίες</a>
-    ${phone ? `<a class="act" href="tel:${esc(phone.replace(/\s/g, ""))}"><span class="act-ic">${ICON.phone}</span>Κλήση</a>` : `<button class="act" data-action="shop-tab" data-v="contacts"><span class="act-ic">${ICON.phone}</span>Επαφές</button>`}
+    ${phone ? `<a class="act" href="${esc(telHref(phone))}"><span class="act-ic">${ICON.phone}</span>Κλήση</a>` : `<button class="act" data-action="shop-tab" data-v="contacts"><span class="act-ic">${ICON.phone}</span>Επαφές</button>`}
     ${canEdit() && s.id ? `<button class="act" data-action="log-visit" data-id="${esc(s.id)}"><span class="act-ic">${ICON.done}</span>Επίσκεψη</button>` : `<button class="act" data-action="shop-tab" data-v="photos"><span class="act-ic">${ICON.camera}</span>Φωτογραφίες</button>`}
     <button class="act" data-action="talk"><span class="act-ic">${ICON.mic}</span>B1ble</button>
   </div>
