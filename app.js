@@ -367,7 +367,7 @@ function homeHub(d) {
       <svg class="hub-lines" viewBox="0 0 390 430" preserveAspectRatio="none" aria-hidden="true"><line x1="195" y1="215" x2="66" y2="78"/><line x1="195" y1="215" x2="324" y2="78"/><line x1="195" y1="215" x2="195" y2="380"/></svg>
       <span class="hub-ring r2"></span><span class="hub-ring r1"></span>
       <span class="hub-tap">Πάτα και μίλα μου</span>
-      <button class="hub-core" data-action="talk" aria-label="Μίλα στον B1ble"><img src="icons/icon-512.png?v=3" alt=""></button>
+      <button class="hub-core" data-action="talk" aria-label="Μίλα στον B1ble"><img src="icons/icon-512.png?v=4" alt=""></button>
       ${node("n1", "shops", ic('<path d="M3 10l1.5-5h15L21 10"/><path d="M4 10v10h16V10"/><path d="M3 10h18"/><path d="M9 20v-5h6v5"/>'), "Μαγαζιά", plural(d.customers.length, "πελάτης", "πελάτες"))}
       ${node("n2", "agenda", ic('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'), "Ατζέντα", tasksToday ? `${tasksToday} για σήμερα` : plural(d.todayShops.length, "επίσκεψη", "επισκέψεις"), tasksToday)}
       ${node("n3", "more", ic('<rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/>'), "Άλλα", "Ρυθμίσεις, κατάλογοι")}

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 200">
+<defs><linearGradient id="bk-c" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#0891B2"/><stop offset=".5" stop-color="#A5F3FC"/><stop offset="1" stop-color="#0891B2"/></linearGradient>
+<radialGradient id="bk-core"><stop offset="0" stop-color="#F0FDFF"/><stop offset=".45" stop-color="#67E8F9"/><stop offset="1" stop-color="#0891B2" stop-opacity="0"/></radialGradient>
+<filter id="bk-gl" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+<g fill="none" stroke="url(#bk-c)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" filter="url(#bk-gl)">
+<path d="M120 170C95 150 55 145 18 152V40c37-7 77-2 102 18"/><path d="M120 170c25-20 65-25 102-18V40c-37-7-77-2-102 18z"/>
+<path d="M120 58v112" stroke-opacity=".7"/>
+<path d="M36 70c25-3 50 0 68 10M36 94c25-3 50 0 68 10M36 118c25-3 50 0 68 10" stroke-width="2.5" stroke-opacity=".45"/>
+<path d="M204 70c-25-3-50 0-68 10M204 94c-25-3-50 0-68 10M204 118c-25-3-50 0-68 10" stroke-width="2.5" stroke-opacity=".45"/></g>
+<circle cx="120" cy="36" r="22" fill="url(#bk-core)"/><path d="M120 6v10M120 56v6M92 36h-8M156 36h-8" stroke="#A5F3FC" stroke-width="2.5" stroke-linecap="round"/>
+</svg>
