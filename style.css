@@ -887,7 +887,7 @@ body.on-hub #app { padding-top: 0; }
 .hdr-book { width: 44px; height: 38px; object-fit: contain; display: block; margin-top: 1px; filter: drop-shadow(0 0 6px rgba(34, 211, 238, 0.5)); }
 
 /* landing page: B1ble artwork full screen; greeting at the top, buttons at the bottom */
-.welcome.wl-art { background: #000 url("icons/landing.jpg") center / cover no-repeat; justify-content: space-between; padding-top: calc(28px + env(safe-area-inset-top, 0px)); padding-bottom: calc(26px + env(safe-area-inset-bottom, 0px)); }
+.welcome.wl-art { background: radial-gradient(60% 35% at 50% 46%, rgba(20, 100, 255, 0.22), transparent 70%), #000; justify-content: space-between; padding-top: calc(28px + env(safe-area-inset-top, 0px)); padding-bottom: calc(26px + env(safe-area-inset-bottom, 0px)); }
 .welcome.wl-art::before, .welcome.wl-art .wl-glow, .welcome.wl-art .wl-acropolis, .welcome.wl-art .wl-brand, .welcome.wl-art .wl-cards, .welcome.wl-art .wl-tip { display: none; }
 .welcome.wl-art .wl-mid { flex: 0 0 auto; margin: 0 !important; padding: 0 !important; justify-content: flex-start; text-align: center; gap: 4px; }
 .welcome.wl-art .wl-date { color: #7DB8FF; }
@@ -896,3 +896,9 @@ body.on-hub #app { padding-top: 0; }
 .welcome.wl-art .wl-actions { margin-top: auto; }
 .welcome.wl-art .wl-btn.primary { background: linear-gradient(135deg, #3B9BFF, #1463E6); color: #fff; box-shadow: 0 0 28px rgba(30, 136, 255, 0.55); }
 .welcome.wl-art .wl-btn.glass { background: rgba(10, 24, 48, 0.6); border-color: rgba(59, 155, 255, 0.4); }
+.wl-neural { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.wl-logo { position: fixed; left: 50%; top: 46%; transform: translate(-50%, -50%); width: min(88vw, 460px); height: auto; pointer-events: none; filter: drop-shadow(0 0 24px rgba(30, 136, 255, 0.45)); }
+@media (prefers-reduced-motion: no-preference) { .wl-logo { animation: wl-logo-in 1.1s ease-out both, wl-logo-glow 3.2s ease-in-out 1.1s infinite; } }
+@keyframes wl-logo-in { from { opacity: 0; transform: translate(-50%, -50%) scale(0.92); filter: drop-shadow(0 0 0 rgba(30, 136, 255, 0)); } }
+@keyframes wl-logo-glow { 50% { filter: drop-shadow(0 0 38px rgba(30, 160, 255, 0.75)); } }
+.welcome.wl-art .wl-mid, .welcome.wl-art .wl-actions { position: relative; z-index: 1; }

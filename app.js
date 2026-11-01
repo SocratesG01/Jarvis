@@ -1449,7 +1449,8 @@ function showWelcome() {
   try { if (sessionStorage.getItem("jarvis-welcomed")) return; } catch {}
   document.getElementById("wl-tip").textContent = TIPS[new Date().getDate() % TIPS.length];
   welcome.hidden = false; renderWelcome();
-  bVoice.welcome = true; playWelcome().catch(() => {}); // most phones wait for the first tap; the pointerdown handler plays it then
+  bVoice.welcome = true; playWelcome().catch(() => {});
+  startLanding(); // most phones wait for the first tap; the pointerdown handler plays it then
 }
 function renderWelcome() {
   if (welcome.hidden) return;
@@ -1464,8 +1465,16 @@ function renderWelcome() {
   document.getElementById("wl-sub").textContent = !ready ? "Ετοιμάζω τη μέρα σου…" : due ? `Έχεις ${plural(due, "εργασία", "εργασίες")} για σήμερα. Πάμε!` : "Καμία εκκρεμότητα για σήμερα. Καλή δουλειά!";
   document.getElementById("wl-cards").innerHTML = card(due, "Εργασίες σήμερα", ICON.check) + card(visits, "Επισκέψεις εβδομάδας", ic('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>')) + card(customers, "Πελάτες", ICON.shop);
 }
+let stopLanding = null;
+function startLanding() {
+  const cv = welcome.querySelector(".wl-neural"), logo = document.getElementById("wl-logo");
+  if (!cv || !logo) return;
+  const go = () => import("./neural.js").then((m) => { if (!welcome.hidden && !stopLanding) stopLanding = m.startNeural(cv, logo); }).catch(() => {});
+  if (logo.complete) requestAnimationFrame(go); else logo.addEventListener("load", go, { once: true });
+}
 function closeWelcome(then) {
   try { sessionStorage.setItem("jarvis-welcomed", "1"); } catch {}
+  if (stopLanding) setTimeout(() => { stopLanding && stopLanding(); stopLanding = null; }, 400);
   welcome.classList.add("leaving");
   setTimeout(() => { welcome.hidden = true; welcome.classList.remove("leaving"); if (then) then(); }, 380);
 }
