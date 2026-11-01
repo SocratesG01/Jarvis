@@ -11,7 +11,7 @@ const CATEGORIES = ["Beer", "Wine", "Whisky", "Vodka", "Gin", "Rum", "Tequila", 
 const PHOTO_KINDS = [["exterior", "Πρόσοψη"], ["interior", "Εσωτερικό"], ["backbar", "Back bar"], ["menu", "Μενού & τιμοκατάλογος"], ["other", "Άλλες"]];
 const SHOP_TABS = [["overview", "Επισκόπηση"], ["photos", "Φωτογραφίες"], ["assets", "Εξοπλισμός"], ["posm", "POSM"], ["backbar", "Back bar"], ["menu", "Μενού & τιμές"], ["consumption", "Κατανάλωση"], ["contacts", "Επαφές"], ["visits", "Επισκέψεις & εργασίες"]];
 const QUIET_DAYS = 30;
-/* Stored values stay in English (so old records and Jarvis keep working); the screen shows Greek. */
+/* Stored values stay in English (so old records and B1ble keep working); the screen shows Greek. */
 const GR = {
   "Restaurant": "Εστιατόριο", "Café": "Καφέ", "Bar": "Μπαρ", "Cocktail bar": "Κοκτέιλ μπαρ", "Hotel": "Ξενοδοχείο", "Beach bar": "Beach bar", "Club": "Κλαμπ", "Taverna": "Ταβέρνα", "Kiosk / mini market": "Περίπτερο / μίνι μάρκετ", "Catering": "Catering", "Other": "Άλλο",
   "Beer fridge": "Ψυγείο μπύρας", "Drinks fridge": "Ψυγείο ποτών", "Freezer": "Καταψύκτης", "Beer tap / tower": "Βρύση / πύργος μπύρας", "Keg cooler": "Ψύκτης βαρελιών", "Coffee machine": "Μηχανή καφέ", "Coffee grinder": "Μύλος καφέ", "Ice machine": "Παγομηχανή", "Display cabinet": "Βιτρίνα", "Furniture": "Έπιπλα",
@@ -138,7 +138,7 @@ function datalists() {
 const TABS = ["today", "shops", "agenda", "more"];
 const PARENT = { map: "more", prospects: "more", market: "more", catalogues: "more", tasks: "agenda", settings: "more", route: "agenda", report: "more", alerts: "today", files: "more", watch: "more", sales: "more" };
 const PAGES = [...TABS, ...Object.keys(PARENT)];
-const TITLES = { today: "Jarvis", shops: "Μαγαζιά", agenda: "Ατζέντα", more: "Άλλα", map: "Χάρτης", prospects: "Υποψήφιοι", market: "Μερίδιο αγοράς", catalogues: "Κατάλογοι", tasks: "Όλες οι εργασίες", settings: "Ρυθμίσεις", route: "Διαδρομή ημέρας", report: "Εβδομαδιαία αναφορά", alerts: "Ειδοποιήσεις", files: "Αρχεία δουλειάς", watch: "Παρακολούθηση αγοράς", sales: "Πωλήσεις & στόχοι" };
+const TITLES = { today: "B1ble", shops: "Μαγαζιά", agenda: "Ατζέντα", more: "Άλλα", map: "Χάρτης", prospects: "Υποψήφιοι", market: "Μερίδιο αγοράς", catalogues: "Κατάλογοι", tasks: "Όλες οι εργασίες", settings: "Ρυθμίσεις", route: "Διαδρομή ημέρας", report: "Εβδομαδιαία αναφορά", alerts: "Ειδοποιήσεις", files: "Αρχεία δουλειάς", watch: "Παρακολούθηση αγοράς", sales: "Πωλήσεις & στόχοι" };
 function nav(view) { if (location.hash.slice(1) === view) go(view); else location.hash = view; }
 function go(view) { Object.assign(state, { reading: null, view, shopId: null, catId: null, editing: false, armed: null, dirty: false }); render(); window.scrollTo(0, 0); }
 function openShop(id, opts = {}) { Object.assign(state, { reading: null, shopId: id, catId: null, editing: !!opts.edit, armed: null, dirty: false, shopTab: opts.tab || "overview", consProduct: null }); render(); window.scrollTo(0, 0); }
@@ -378,16 +378,16 @@ function viewToday() {
   <section class="jx-hero">${NIGHT}
     <div class="jx-top"><h1 class="jx-hi">${greeting()}${name ? `, <span class="jx-name">${esc(name)}</span>` : ""}</h1>${weatherHtml()}</div>
     <p class="jx-brief"><b>${esc(new Date().toLocaleDateString("el-GR", { weekday: "long", day: "numeric", month: "long" }))}</b><br>${brief}</p>
-    ${canEdit() ? `<button class="jx-start" data-action="start-day">${started ? ICON.route : ICON.play}<span><b>${started ? "Συνέχισε τη μέρα" : "Ξεκίνα τη μέρα μου"}</b><small>${started ? `${doneN} από ${plural(todayShops.length, "επίσκεψη", "επισκέψεις")} έγιναν` : "Ο Jarvis φτιάχνει τη διαδρομή με τις προτεραιότητές σου"}</small></span><span class="chev">${ICON.chev}</span></button>` : ""}
+    ${canEdit() ? `<button class="jx-start" data-action="start-day">${started ? ICON.route : ICON.play}<span><b>${started ? "Συνέχισε τη μέρα" : "Ξεκίνα τη μέρα μου"}</b><small>${started ? `${doneN} από ${plural(todayShops.length, "επίσκεψη", "επισκέψεις")} έγιναν` : "Ο B1ble φτιάχνει τη διαδρομή με τις προτεραιότητές σου"}</small></span><span class="chev">${ICON.chev}</span></button>` : ""}
     ${canEdit() ? `<button class="jx-car" data-action="car">${CAR_ICON}<span>Λειτουργία αυτοκινήτου</span></button>` : ""}
   </section>
   <section class="jx-card jx-sched">
     <div class="jx-sched-head"><span class="jx-ic">${ic('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 14h2M12 14h2M8 17h2"/>')}</span><span class="grow"><b>Σήμερα</b><small>${todayShops.length ? `${doneN}/${todayShops.length} επισκέψεις` : "Καμία προγραμματισμένη επίσκεψη"}</small></span><a href="#route" class="link">Διαδρομή ›</a></div>
-    <ul class="jx-list">${plan.length ? plan.join("") : `<li class="jx-empty">${art("calendar")}<span>Τίποτα προγραμματισμένο. Πάτα «Ξεκίνα τη μέρα μου» και ο Jarvis διαλέγει από τις προτεραιότητες.</span></li>`}</ul>
+    <ul class="jx-list">${plan.length ? plan.join("") : `<li class="jx-empty">${art("calendar")}<span>Τίποτα προγραμματισμένο. Πάτα «Ξεκίνα τη μέρα μου» και ο B1ble διαλέγει από τις προτεραιότητες.</span></li>`}</ul>
   </section>
   ${overdue.length ? `<section class="section"><div class="section-head"><h2 class="bad-h">Εκπρόθεσμα follow-ups</h2>${overdue.length > 5 ? `<a href="#tasks" class="link">Όλα (${overdue.length}) ›</a>` : ""}</div><div class="panel"><ul class="list">${overdue.slice(0, 5).map(taskRow).join("")}</ul></div></section>` : ""}
   ${pri.length ? `<section class="section"><div class="section-head"><h2>Προτεραιότητες</h2><span class="muted small">ποιους να δεις πρώτα</span></div><div class="panel"><ul class="list">${pri.map((p) => shopRow(p.s, p.why.join(" · "), null, true)).join("")}</ul></div></section>` : ""}
-  <button class="jx-ask" data-action="talk"><span class="jx-ask-ic">${ic('<path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4 3v-3H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/><path d="M8 10h8M8 13h5"/>')}</span><span class="grow"><b>Ρώτα τον JARVIS</b><small>«Ποιες εκκρεμότητες έχω αυτή την εβδομάδα;»</small></span><span class="chev">${ICON.chev}</span></button>
+  <button class="jx-ask" data-action="talk"><span class="jx-ask-ic">${ic('<path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4 3v-3H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/><path d="M8 10h8M8 13h5"/>')}</span><span class="grow"><b>Ρώτα τον B1BLE</b><small>«Ποιες εκκρεμότητες έχω αυτή την εβδομάδα;»</small></span><span class="chev">${ICON.chev}</span></button>
   <div class="jx-stats">
     ${card("shop-filter", "active", ic('<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0M16 5.5a3 3 0 0 1 0 6M18 19a5 5 0 0 0-2.5-4.3"/>'), customers.length, "Πελάτες", newCustomers ? `<span class="up">+${newCustomers}</span> νέοι τις τελευταίες 7 μέρες` : `${plural(state.shops.length, "μαγαζί", "μαγαζιά")} συνολικά`)}
     ${card("go", "settings", ic('<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/><path d="M12 12l7-7M16 5h3v3"/>'), pct + "%", "Στόχος επισκέψεων", `${monthVisits} από ${target} αυτόν τον μήνα`, `<span class="jx-bar"><span style="width:${pct}%"></span></span>`)}
@@ -436,11 +436,11 @@ function viewAgenda() {
   const undated = state.tasks.filter((x) => !x.done && !x.due);
   const label = sel === t ? "Σήμερα" : sel === addDays(t, 1) ? "Αύριο" : new Date(sel + "T00:00:00").toLocaleDateString("el-GR", { weekday: "long", day: "numeric", month: "long" });
   return `${banner()}${strip}
-  <button class="panel route-cta" data-action="go" data-v="route"><span class="tile-ic">${ICON.route}</span><span class="grow"><b>Διαδρομή ημέρας</b><small>Διάλεξε μαγαζιά, ο Jarvis βρίσκει την καλύτερη σειρά</small></span><span class="chev">${ICON.chev}</span></button>
+  <button class="panel route-cta" data-action="go" data-v="route"><span class="tile-ic">${ICON.route}</span><span class="grow"><b>Διαδρομή ημέρας</b><small>Διάλεξε μαγαζιά, ο B1ble βρίσκει την καλύτερη σειρά</small></span><span class="chev">${ICON.chev}</span></button>
   <div class="section-head"><h2 class="day-title">${esc(label)}</h2><input type="date" class="date-jump" data-action="agenda-pick" value="${sel}" aria-label="Διάλεξε ημερομηνία"></div>
   ${overdue.length ? `<section class="section"><h3 class="group bad">Εκπρόθεσμες</h3><div class="panel"><ul class="list">${overdue.map(taskRow).join("")}</ul></div></section>` : ""}
   ${calOn(sel).length ? `<section class="section"><h3 class="group">Ημερολόγιο</h3><div class="panel"><ul class="list">${calOn(sel).map(calRow).join("")}</ul></div></section>` : ""}
-  <section class="section"><h3 class="group">Επισκέψεις</h3><div class="panel"><ul class="list">${visits.length ? visits.map((s) => shopRow(s, "Προγραμματισμένη επίσκεψη")).join("") : emptyLi("calendar", "Καμία επίσκεψη. Όρισε επόμενη επίσκεψη σε ένα μαγαζί ή πες το στον Jarvis.")}</ul></div></section>
+  <section class="section"><h3 class="group">Επισκέψεις</h3><div class="panel"><ul class="list">${visits.length ? visits.map((s) => shopRow(s, "Προγραμματισμένη επίσκεψη")).join("") : emptyLi("calendar", "Καμία επίσκεψη. Όρισε επόμενη επίσκεψη σε ένα μαγαζί ή πες το στον B1ble.")}</ul></div></section>
   <section class="section"><h3 class="group">Εργασίες</h3><div class="panel"><ul class="list">${tasks.length ? tasks.map(taskRow).join("") : emptyLi("tasks", "Τίποτα για αυτή τη μέρα.")}</ul></div>${taskForm(null, sel)}</section>
   ${undated.length ? `<section class="section"><h3 class="group">Χωρίς ημερομηνία</h3><div class="panel"><ul class="list">${undated.map(taskRow).join("")}</ul></div></section>` : ""}
   <a href="#tasks" class="link center">Όλες οι εργασίες</a>`;
@@ -541,7 +541,7 @@ function viewRoute() {
     <div class="stop-move"><button class="icon-btn small" data-action="route-move" data-id="${esc(s.id)}" data-v="-1" aria-label="Πιο νωρίς" ${i ? "" : "disabled"}>${ic('<path d="M6 15l6-6 6 6"/>')}</button><button class="icon-btn small" data-action="route-move" data-id="${esc(s.id)}" data-v="1" aria-label="Πιο αργά" ${i < stops.length - 1 ? "" : "disabled"}>${ic('<path d="M6 9l6 6 6-6"/>')}</button><button class="icon-btn small" data-action="route-toggle" data-id="${esc(s.id)}" aria-label="Αφαίρεση">${ic('<path d="M6 6l12 12M18 6L6 18"/>')}</button></div></li>`;
   return `${banner()}
   <section class="section"><div class="panel route-card">${geo.length ? routeMap(stops.filter(hasGeo), here) : ""}
-    <div class="route-sum">${stops.length ? `<b class="num">${stops.length}</b> ${stops.length === 1 ? "στάση" : "στάσεις"}${geo.length ? ` · <b class="num">${km.toFixed(1)} km</b> · περίπου <b class="num">${Math.round(km / 22 * 60 + stops.length * 20)}</b> λεπτά μαζί με 20' ανά επίσκεψη` : ""}${visited.size ? ` · <b class="num">${stops.filter((s) => visited.has(s.id)).length}</b> έγιναν` : ""}` : "Διάλεξε πελάτες από κάτω. Ο Jarvis σου δείχνει πρώτα τις προτεραιότητες, ομαδοποιημένες ανά περιοχή."}</div>
+    <div class="route-sum">${stops.length ? `<b class="num">${stops.length}</b> ${stops.length === 1 ? "στάση" : "στάσεις"}${geo.length ? ` · <b class="num">${km.toFixed(1)} km</b> · περίπου <b class="num">${Math.round(km / 22 * 60 + stops.length * 20)}</b> λεπτά μαζί με 20' ανά επίσκεψη` : ""}${visited.size ? ` · <b class="num">${stops.filter((s) => visited.has(s.id)).length}</b> έγιναν` : ""}` : "Διάλεξε πελάτες από κάτω. Ο B1ble σου δείχνει πρώτα τις προτεραιότητες, ομαδοποιημένες ανά περιοχή."}</div>
     ${here ? "" : `<div class="row-actions"><button class="btn small" data-action="route-locate">${ICON.locate} Ξεκίνα από εκεί που είμαι</button></div>`}
   </div></section>
   ${stops.length ? `<section class="section"><div class="section-head"><h2>Η σειρά σου</h2>${R.manual ? `<button class="link" data-action="route-auto">Βέλτιστη σειρά</button>` : `<span class="muted small">με τα βέλη αλλάζεις τη σειρά</span>`}</div><div class="panel"><ol class="list stops">${stops.map(stopRow).join("")}</ol></div>
@@ -645,7 +645,7 @@ function viewSales() {
   <section class="section"><div class="section-head"><h2>Στόχοι</h2>${pace != null ? `<span class="muted small"><i class="pace-key"></i> ρυθμός μέχρι σήμερα</span>` : ""}</div><div class="panel"><div class="share">${targetRows}</div>
     ${canEdit() ? `<details class="adder"><summary>+ Στόχος προϊόντος για κάθε μήνα</summary><form class="inline-form" data-form="target"><div class="grid2">${fld({ form: "target", name: "product", label: "Προϊόν", list: "dl-products", required: true })}${fld({ form: "target", name: "qty", label: "Ποσότητα τον μήνα", type: "number", required: true, attrs: 'min="1" step="any" inputmode="decimal"' })}${fld({ form: "target", name: "unit", label: "Μονάδα", ph: "κιβώτια" })}</div><div class="row-actions"><button class="btn primary small" type="submit">Αποθήκευση στόχου</button></div></form></details>` : ""}</div>
     <p class="muted small">Ο στόχος επισκέψεων και νέων πελατών αλλάζει από τις <a href="#settings" class="link small">Ρυθμίσεις</a>.</p></section>
-  ${noData ? `<section class="section"><div class="panel">${emptyDiv("chart", "Δεν υπάρχουν ακόμα όγκοι πωλήσεων. Μπαίνουν όταν καταγράφεις παραγγελία στην «Επίσκεψη», όταν το πεις στον Jarvis, από την καρτέλα Κατανάλωση ή από αρχείο πωλήσεων στα Αρχεία δουλειάς.")}</div></section>`
+  ${noData ? `<section class="section"><div class="panel">${emptyDiv("chart", "Δεν υπάρχουν ακόμα όγκοι πωλήσεων. Μπαίνουν όταν καταγράφεις παραγγελία στην «Επίσκεψη», όταν το πεις στον B1ble, από την καρτέλα Κατανάλωση ή από αρχείο πωλήσεων στα Αρχεία δουλειάς.")}</div></section>`
     : `<section class="section"><h2>Όγκοι ανά προϊόν</h2><div class="panel table-wrap"><table><thead><tr><th>Προϊόν</th><th class="r">${esc(fmtMonth(d.cur))}</th><th class="r">${esc(fmtMonth(d.prev))}</th><th class="r">Μαγαζιά</th></tr></thead><tbody>${prodRows.map((r) => { const b = d.before.get(norm(r.name)); return `<tr><td>${esc(r.name)}</td><td class="r num">${fmtQty(r.qty)} ${esc(r.unit)} ${delta(r.qty, b ? b.qty : 0)}</td><td class="r num">${b ? fmtQty(b.qty) : "–"}</td><td class="r num">${r.shops ? r.shops.size : 0}</td></tr>`; }).join("")}</tbody></table></div>${off === 0 ? `<p class="muted small">Ο τρέχων μήνας δεν έχει τελειώσει, οπότε τα νούμερα είναι μέχρι σήμερα.</p>` : ""}</section>
   <section class="section"><h2>Ανά πελάτη</h2><div class="panel"><ul class="list">${topShops.length ? topShops.map((x) => `<li><button class="item" data-action="open" data-id="${esc(x.s.id)}">${shopAvatar(x.s)}<div class="grow"><div class="title">${esc(x.s.name)}</div><div class="sub">${[...x.now.entries()].map(([k, r]) => { const b = x.before.get(k); return `${esc(r.name)} ${fmtQty(r.qty)} ${esc(r.unit)}${b ? ` (${b.qty <= r.qty ? "↑" : "↓"} από ${fmtQty(b.qty)})` : ""}`; }).join(" · ")}</div></div><span class="chev">${ICON.chev}</span></button></li>`).join("") : emptyLi("chart", "Καμία κίνηση αυτόν τον μήνα.")}</ul></div></section>`}
   <section class="section"><div class="section-head"><h2>Διανομή προϊόντων</h2><span class="muted small">${plural(dist.total, "πελάτης", "πελάτες")}</span></div><div class="panel">${dist.rows.length ? `<div class="share">${dist.rows.slice(0, 12).map((r) => bar(esc(r.name), dist.total ? r.shops.length / dist.total : 0, `${r.shops.length}/${dist.total}`, null)).join("")}</div>` : emptyDiv("chart", "Η διανομή φαίνεται όταν οι πελάτες σου έχουν προϊόντα, παραγγελίες ή κατανάλωση.")}</div><p class="muted small">Πόσοι πελάτες παίρνουν κάθε προϊόν τους τελευταίους 6 μήνες (παραγγελίες, κατανάλωση, λίστα προϊόντων${state.settings.myCompany ? ", δικές μας φιάλες στο back bar" : ""}).</p></section>
@@ -699,7 +699,7 @@ function viewReport() {
   return `${banner()}<div class="chips">${[[0, "Αυτή η εβδομάδα"], [-1, "Προηγούμενη"], [-2, "Πριν 2 εβδομάδες"]].map(([k, l]) => `<button class="chip" data-action="report-week" data-v="${k}" aria-pressed="${off === k}">${l}</button>`).join("")}</div>
   <p class="muted small">${fmtDate(r.a)} έως ${fmtDate(addDays(r.b, -1))}</p>
   <div class="stats">${tile(r.visits.length, "Επισκέψεις")}${tile(r.newShops.length, "Νέα μαγαζιά")}${tile(r.won.length, "Κερδίσαμε", "good")}${tile(r.lost.length, "Χάσαμε", r.lost.length ? "bad" : "")}${tile(r.done.length, "Εργασίες έγιναν")}${tile(r.overdue.length, "Εκπρόθεσμες", r.overdue.length ? "bad" : "")}</div>
-  <section class="section"><div class="section-head"><h2>Το κείμενο της αναφοράς</h2>${state.sample ? `<button class="link" data-action="report-ai" ${state.reportBusy ? "disabled" : ""}>${state.reportBusy ? "Ο Jarvis γράφει…" : "✨ Γράψ' το ωραία με τον Jarvis"}</button>` : ""}</div>
+  <section class="section"><div class="section-head"><h2>Το κείμενο της αναφοράς</h2>${state.sample ? `<button class="link" data-action="report-ai" ${state.reportBusy ? "disabled" : ""}>${state.reportBusy ? "Ο B1ble γράφει…" : "✨ Γράψ' το ωραία με τον B1ble"}</button>` : ""}</div>
   <div class="panel"><textarea class="report-text" id="report-text" rows="14">${esc(text)}</textarea></div>
   ${state.reportErr ? `<p class="small" style="color:var(--bad)">${esc(state.reportErr)}</p>` : ""}
   <div class="row-actions"><button class="btn primary" data-action="report-share">Κοινοποίηση</button><button class="btn" data-action="report-copy">Αντιγραφή</button><a class="btn" href="mailto:?subject=${encodeURIComponent("Εβδομαδιαία αναφορά " + fmtDate(r.a))}&body=${encodeURIComponent(text)}">Email</a></div></section>`;
@@ -731,7 +731,7 @@ const urgentCount = () => alertsList().filter((x) => x.lvl !== "info").length;
 function viewAlerts() {
   const A = alertsList();
   const perm = "Notification" in window ? Notification.permission : "unsupported";
-  return `${banner()}${perm === "default" ? `<div class="panel notice"><div class="grow"><b>Ειδοποιήσεις στο κινητό</b><div class="sub">Μια σύνοψη στην οθόνη του κινητού μία φορά τη μέρα, όταν ανοίγεις τον Jarvis.</div></div><button class="btn small primary" data-action="notif-on">Ενεργοποίηση</button></div>` : ""}
+  return `${banner()}${perm === "default" ? `<div class="panel notice"><div class="grow"><b>Ειδοποιήσεις στο κινητό</b><div class="sub">Μια σύνοψη στην οθόνη του κινητού μία φορά τη μέρα, όταν ανοίγεις τον B1ble.</div></div><button class="btn small primary" data-action="notif-on">Ενεργοποίηση</button></div>` : ""}
   <div class="panel"><ul class="list">${A.length ? A.map((x) => `<li><button class="item alert ${x.lvl}" ${x.go ? `data-action="go" data-v="${x.go}"` : x.id ? `data-action="open" data-id="${esc(x.id)}"` : `data-action="go" data-v="agenda"`}><i class="d"></i><div class="grow"><div class="title">${esc(x.text)}</div>${x.sub ? `<div class="sub">${esc(x.sub)}</div>` : ""}</div><span class="chev">${ICON.chev}</span></button></li>`).join("") : emptyLi("tasks", "Όλα καθαρά. Καμία εκκρεμότητα.")}</ul></div>`;
 }
 function notifyDaily() {
@@ -742,7 +742,7 @@ function notifyDaily() {
     if (localStorage.getItem("jarvis-notified") === todayISO()) return;
     localStorage.setItem("jarvis-notified", todayISO());
     const A = alertsList().filter((x) => x.lvl !== "info");
-    navigator.serviceWorker.ready.then((reg) => reg.showNotification(`Jarvis: ${plural(n, "εκκρεμότητα", "εκκρεμότητες")} σήμερα`, { body: A.slice(0, 3).map((x) => x.text).join("\n"), icon: "icons/icon-192.png", badge: "icons/icon-192.png", tag: "jarvis-daily", data: { url: "./#alerts" } })).catch(() => {});
+    navigator.serviceWorker.ready.then((reg) => reg.showNotification(`B1ble: ${plural(n, "εκκρεμότητα", "εκκρεμότητες")} σήμερα`, { body: A.slice(0, 3).map((x) => x.text).join("\n"), icon: "icons/icon-192.png", badge: "icons/icon-192.png", tag: "jarvis-daily", data: { url: "./#alerts" } })).catch(() => {});
   } catch {}
 }
 
@@ -870,7 +870,7 @@ function viewFiles() {
       ${!r.updates.length && !(r.catalogue && r.catalogue.company) ? `<li class="empty">Δεν βρήκα κάτι να περάσω.</li>` : ""}</ul></div>
       <div class="row-actions">${r.updates.length || (r.catalogue && r.catalogue.company) ? `<button class="btn primary" data-action="file-save" ${j.saving ? "disabled" : ""}>${j.saving ? "Αποθήκευση…" : "Αποθήκευση όλων"}</button>` : ""}<button class="btn" data-action="file-cancel">Ακύρωση</button></div></section>`;
   }
-  return `${banner()}<p class="muted small">Ανέβασε τιμοκατάλογο, αναφορά κατανάλωσης, λίστα πελατών ή κατάλογο (Excel, CSV ή PDF). Ο Jarvis βρίσκει σε ποια μαγαζιά αντιστοιχεί κάθε γραμμή και σου δείχνει τι θα αποθηκεύσει πριν το περάσει.</p>
+  return `${banner()}<p class="muted small">Ανέβασε τιμοκατάλογο, αναφορά κατανάλωσης, λίστα πελατών ή κατάλογο (Excel, CSV ή PDF). Ο B1ble βρίσκει σε ποια μαγαζιά αντιστοιχεί κάθε γραμμή και σου δείχνει τι θα αποθηκεύσει πριν το περάσει.</p>
   ${canEdit() && state.sample && !(j && (j.busy || j.result)) ? `<div class="panel inline-form"><label class="field">Τι είναι το αρχείο; (προαιρετικό)<input id="file-note" placeholder="π.χ. κατανάλωση Σεπτεμβρίου, νέα τιμολογιακή"></label><label class="btn primary upload">${ICON.report} Διάλεξε αρχείο<input type="file" accept=".xlsx,.xls,.xlsm,.ods,.csv,.txt,.pdf,application/pdf" data-action="file-pick"></label></div>` : ""}
   ${body}`;
 }
@@ -882,7 +882,7 @@ function gcalLink(title, day, details = "", where = "") {
   return "https://calendar.google.com/calendar/render?action=TEMPLATE&text=" + encodeURIComponent(title) + "&dates=" + icsDate(day) + "/" + icsDate(addDays(day, 1)) + "&details=" + encodeURIComponent(details) + "&location=" + encodeURIComponent(where);
 }
 function exportIcs() {
-  const t = todayISO(), L = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Jarvis//EL", "CALSCALE:GREGORIAN"];
+  const t = todayISO(), L = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//B1ble//EL", "CALSCALE:GREGORIAN"];
   const ev = (uid, day, title, desc, where) => L.push("BEGIN:VEVENT", `UID:${uid}@jarvis`, `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, "").slice(0, 15)}Z`, `DTSTART;VALUE=DATE:${icsDate(day)}`, `DTEND;VALUE=DATE:${icsDate(addDays(day, 1))}`, `SUMMARY:${icsEsc(title)}`, ...(desc ? [`DESCRIPTION:${icsEsc(desc)}`] : []), ...(where ? [`LOCATION:${icsEsc(where)}`] : []), "END:VEVENT");
   state.shops.filter((s) => s.nextVisit && s.nextVisit >= t).forEach((s) => ev("visit-" + s.id + "-" + s.nextVisit, s.nextVisit, `Επίσκεψη: ${s.name}`, [tr(s.type), STATUSES[s.status]].filter(Boolean).join(" · "), [s.address, s.area, s.city].filter(Boolean).join(", ")));
   state.tasks.filter((x) => !x.done && x.due && x.due >= t).forEach((x) => ev("task-" + x.id, x.due, `Εργασία: ${x.title}`, x.shopId && shopById(x.shopId) ? shopById(x.shopId).name : "", ""));
@@ -983,7 +983,7 @@ function viewWatch() {
   const item = (x, i) => { const sh = matchShop(x.name), [lbl, cls] = CHANGE[x.change];
     const act = sh ? (x.change === "closed" && !["closed", "lost"].includes(sh.status) && canEdit() ? `<button class="btn small" data-action="watch-close" data-id="${esc(sh.id)}">Σήμανση ως «Έκλεισε»</button>` : `<button class="btn small" data-action="open" data-id="${esc(sh.id)}">Άνοιγμα</button>`) : x.change !== "closed" && canEdit() ? `<button class="btn small primary" data-action="watch-add" data-area="${esc(sel)}" data-i="${i}">Πρόσθεσε ως υποψήφιο</button>` : "";
     return `<li class="item watch-item"><div class="grow"><div class="title"><span class="pill ${cls}">${lbl}</span> ${esc(x.name)}</div><div class="sub">${esc([tr(x.type), x.address, x.date].filter(Boolean).join(" · "))}</div>${x.note ? `<div class="small">${esc(x.note)}</div>` : ""}<div class="row-actions">${act}${x.url ? `<a class="link small" href="${esc(x.url)}" target="_blank" rel="noopener">Πηγή ›</a>` : ""}</div>${sh ? `<div class="sub">Το έχεις ήδη: ${esc(sh.name)} (${esc(STATUSES[sh.status] || "")})</div>` : ""}</div></li>`; };
-  return `${banner()}<p class="muted small">Ο Jarvis ψάχνει στο ίντερνετ για μαγαζιά που άνοιξαν, ανοίγουν ή έκλεισαν στην περιοχή σου τους τελευταίους 3 μήνες. Κάθε σάρωση κάνει έως 8 αναζητήσεις (περίπου 0,10 € μαζί με τη χρήση του Claude).</p>
+  return `${banner()}<p class="muted small">Ο B1ble ψάχνει στο ίντερνετ για μαγαζιά που άνοιξαν, ανοίγουν ή έκλεισαν στην περιοχή σου τους τελευταίους 3 μήνες. Κάθε σάρωση κάνει έως 8 αναζητήσεις (περίπου 0,10 € μαζί με τη χρήση του Claude).</p>
   <div class="scroller">${(areas.length ? areas : [sel]).map((a) => `<button class="chip" data-action="watch-area" data-v="${esc(a)}" aria-pressed="${a === sel}">${esc(a)}${(state.watch || {})[a] ? `<span class="n">${(state.watch[a].items || []).length}</span>` : ""}</button>`).join("")}</div>
   <div class="row-actions"><button class="btn primary" data-action="watch-scan" data-v="${esc(sel)}" ${state.watchBusy || !canEdit() || !state.sample ? "disabled" : ""}>${state.watchBusy === sel ? "Ψάχνω… (έως 1–2 λεπτά)" : `Σάρωση: ${esc(sel)}`}</button>${data ? `<span class="muted small">Τελευταία σάρωση ${esc(fmtDate(data.at.slice(0, 10)))}</span>` : ""}</div>
   ${state.watchErr ? `<div class="banner">${esc(state.watchErr)}</div>` : ""}
@@ -1013,7 +1013,7 @@ function viewShops() {
   const split = ["active", "az", "competitor"].map((k) => [k, count(k)]), splitTotal = split.reduce((a, [, n]) => a + n, 0);
   const achip = (k, label, n) => `<button class="chip" data-action="area" data-a="${esc(k)}" aria-pressed="${state.areaFilter === k}">${k === "all" ? "" : `<i class="area-dot" style="--h:${hue(k)}"></i>`}${esc(label)}${n != null ? `<span class="n">${n}</span>` : ""}</button>`;
   let body;
-  if (!list.length) body = `<div class="panel">${emptyDiv("pin", state.shops.length ? "Κανένα μαγαζί δεν ταιριάζει." : "Δεν υπάρχουν μαγαζιά ακόμα. Πρόσθεσε το πρώτο ή πες το στον Jarvis μετά από μια επίσκεψη.")}</div>`;
+  if (!list.length) body = `<div class="panel">${emptyDiv("pin", state.shops.length ? "Κανένα μαγαζί δεν ταιριάζει." : "Δεν υπάρχουν μαγαζιά ακόμα. Πρόσθεσε το πρώτο ή πες το στον B1ble μετά από μια επίσκεψη.")}</div>`;
   else if (nearMode) {
     const near = list.filter(hasGeo).map((s) => ({ s, d: distKm(state.here, s) })).sort((a, b) => a.d - b.d);
     body = `<div class="panel"><ul class="list">${near.map(({ s, d }) => shopRow(s, fmtDist(d) + " μακριά")).join("") || `<li class="empty">Κανένα από αυτά τα μαγαζιά δεν έχει αποθηκευμένη τοποθεσία.</li>`}</ul></div>`;
@@ -1094,7 +1094,7 @@ function viewMarket() {
     const cats = state.catalogues.slice().sort((a, b) => (a.company || "").localeCompare(b.company || ""));
     return `${banner()}
     <p class="muted small">Ένας κατάλογος ανά εταιρεία. Τα brands που προσθέτεις εδώ αναγνωρίζονται στο back bar, ώστε κάθε ετικέτα να μετράει στη σωστή εταιρεία.</p>
-    <div class="panel"><ul class="list">${cats.length ? cats.map((c) => { const p = (c.photos || [])[0]; return `<li><button class="item" data-action="open-cat" data-id="${esc(c.id)}">${p ? `<span class="thumb"><img ${img(p.id)} alt="" loading="lazy"></span>` : `<span class="ph">${esc((c.company || "?").charAt(0).toUpperCase())}</span>`}<div class="grow"><div class="title">${esc(c.company)}</div><div class="sub">${(c.items || []).length} προϊόντα · ${(c.photos || []).length} φωτογραφίες</div></div></button></li>`; }).join("") : `<li class="empty">Δεν υπάρχουν κατάλογοι. Πρόσθεσε μια εταιρεία και ανέβασε φωτογραφίες του καταλόγου της. Ο Jarvis διαβάζει τα προϊόντα από τις φωτογραφίες.</li>`}</ul></div>
+    <div class="panel"><ul class="list">${cats.length ? cats.map((c) => { const p = (c.photos || [])[0]; return `<li><button class="item" data-action="open-cat" data-id="${esc(c.id)}">${p ? `<span class="thumb"><img ${img(p.id)} alt="" loading="lazy"></span>` : `<span class="ph">${esc((c.company || "?").charAt(0).toUpperCase())}</span>`}<div class="grow"><div class="title">${esc(c.company)}</div><div class="sub">${(c.items || []).length} προϊόντα · ${(c.photos || []).length} φωτογραφίες</div></div></button></li>`; }).join("") : `<li class="empty">Δεν υπάρχουν κατάλογοι. Πρόσθεσε μια εταιρεία και ανέβασε φωτογραφίες του καταλόγου της. Ο B1ble διαβάζει τα προϊόντα από τις φωτογραφίες.</li>`}</ul></div>
     ${adder("catalogue", "Νέος κατάλογος εταιρείας", [{ name: "company", label: "Εταιρεία", required: true, list: "dl-companies" }], "Προσθήκη εταιρείας")}`;
   }
   const shops = state.shops.filter((s) => state.marketArea === "all" || areaOf(s) === state.marketArea);
@@ -1118,7 +1118,7 @@ function viewMarket() {
 function viewCatalogue(c) {
   const items = (c.items || []).slice().sort((a, b) => (a.category || "").localeCompare(b.category || "") || (a.brand || "").localeCompare(b.brand || ""));
   return `  <section class="section"><div class="section-head"><h2>Φωτογραφίες καταλόγου</h2>${uploadBtn("cat-photo", "Add photos")}</div>
-    <div class="panel">${gallery((c.photos || []), "catalogues", c.id) || `<div class="empty">Δεν υπάρχουν φωτογραφίες. Ανέβασε σελίδες του καταλόγου και ο Jarvis θα περάσει τα προϊόντα στη λίστα από κάτω.</div>`}</div>${(c.photos || []).length ? readingPanel("catalogue") : ""}</section>
+    <div class="panel">${gallery((c.photos || []), "catalogues", c.id) || `<div class="empty">Δεν υπάρχουν φωτογραφίες. Ανέβασε σελίδες του καταλόγου και ο B1ble θα περάσει τα προϊόντα στη λίστα από κάτω.</div>`}</div>${(c.photos || []).length ? readingPanel("catalogue") : ""}</section>
   <section class="section"><div class="section-head"><h2>Προϊόντα</h2><span class="muted small num">${items.length}</span></div>
     <div class="panel table-wrap">${items.length ? `<table><thead><tr><th>Brand</th><th>Προϊόν</th><th>Κατηγορία</th><th>Μέγεθος</th><th>Τιμή</th><th></th></tr></thead><tbody>${(c.items || []).map((it, i) => ({ it, i })).sort((a, b) => (a.it.category || "").localeCompare(b.it.category || "") || (a.it.brand || "").localeCompare(b.it.brand || "")).map(({ it, i }) => `<tr><td>${esc(it.brand)}</td><td>${esc(it.product)}</td><td class="muted">${esc(tr(it.category))}</td><td class="num">${esc(it.size)}</td><td class="num">${esc(it.price)}</td><td class="r">${rmButton(`cat:${c.id}:items:${i}`)}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">Δεν υπάρχουν προϊόντα ακόμα.</div>`}</div>
     ${adder("cat-item", "Νέο προϊόν", [{ name: "brand", label: "Brand", required: true }, { name: "product", label: "Προϊόν" }, { name: "category", label: "Κατηγορία", list: "dl-cats" }, { name: "size", label: "Μέγεθος", ph: "π.χ. 70cl, 330ml" }, { name: "price", label: "Τιμή", ph: "π.χ. €14,50" }], "Προσθήκη")}</section>
@@ -1128,17 +1128,17 @@ function viewCatalogue(c) {
 /* ---------- views: settings ---------- */
 function viewSettings() {
   const vchip = (k, l) => `<button class="chip" data-action="voice-lang" data-v="${k}" aria-pressed="${state.voiceLang === k}">${l}</button>`;
-  const profile = canEdit() ? `<section class="section"><h2>Προφίλ</h2><form class="panel inline-form" data-form="profile"><div class="grid2">${fld({ form: "profile", name: "myName", label: "Πώς να σε λέει ο Jarvis", value: state.settings.myName ?? "Σωκράτη" })}${fld({ form: "profile", name: "visitTarget", label: "Στόχος επισκέψεων τον μήνα", type: "number", value: state.settings.visitTarget || 40, attrs: 'min="1" inputmode="numeric"' })}${fld({ form: "profile", name: "accountsTarget", label: "Στόχος νέων πελατών τον μήνα", type: "number", value: state.settings.accountsTarget || "", attrs: 'min="0" inputmode="numeric"' })}</div><div class="row-actions"><button class="btn primary small" type="submit">Αποθήκευση</button></div></form></section>` : "";
+  const profile = canEdit() ? `<section class="section"><h2>Προφίλ</h2><form class="panel inline-form" data-form="profile"><div class="grid2">${fld({ form: "profile", name: "myName", label: "Πώς να σε λέει ο B1ble", value: state.settings.myName ?? "Σωκράτη" })}${fld({ form: "profile", name: "visitTarget", label: "Στόχος επισκέψεων τον μήνα", type: "number", value: state.settings.visitTarget || 40, attrs: 'min="1" inputmode="numeric"' })}${fld({ form: "profile", name: "accountsTarget", label: "Στόχος νέων πελατών τον μήνα", type: "number", value: state.settings.accountsTarget || "", attrs: 'min="0" inputmode="numeric"' })}</div><div class="row-actions"><button class="btn primary small" type="submit">Αποθήκευση</button></div></form></section>` : "";
   const cal = canEdit() ? `<section class="section"><h2>Ημερολόγιο</h2><form class="panel inline-form" data-form="calendar">${fld({ form: "calendar", name: "icsUrl", label: "Ιδιωτική διεύθυνση iCal του Google Calendar", value: state.settings.icsUrl || "", ph: "https://calendar.google.com/calendar/ical/.../basic.ics" })}
     <p class="muted small">Στο Google Calendar (από υπολογιστή): Ρυθμίσεις → το ημερολόγιό σου → «Ενσωμάτωση ημερολογίου» → «Μυστική διεύθυνση σε μορφή iCal». Αντέγραψέ την εδώ και τα ραντεβού σου θα φαίνονται στην Ατζέντα. Μένει ιδιωτική στον λογαριασμό σου.</p>
     ${state.cal && state.cal.error ? `<p class="small" style="color:var(--bad)">${state.cal.error === "server_old" ? "Χρειάζεται η ενημερωμένη έκδοση του jarvis-ai στο Supabase." : calWhy(state.cal.why)}</p>` : state.cal && state.cal.url === state.settings.icsUrl ? `<p class="muted small">Συνδεδεμένο ✓ ${plural(state.cal.events.length, "ραντεβού", "ραντεβού")} τις επόμενες εβδομάδες.</p>` : ""}
     <div class="row-actions"><button class="btn primary small" type="submit">Αποθήκευση</button>${state.settings.icsUrl ? `<button class="btn small" type="button" data-action="cal-refresh">Ανανέωση</button>` : ""}</div></form>
     <div class="row-actions"><button class="btn" data-action="cal-export">Λήψη επισκέψεων & εργασιών (.ics)</button></div><p class="muted small">Το αρχείο .ics ανοίγει σε Google Calendar, Outlook ή iPhone και περνάει όλες τις προγραμματισμένες επισκέψεις και εργασίες.</p></section>` : "";
   return `${profile}${cal}<section class="section"><h2>Λογαριασμός</h2><div class="panel"><dl class="kv"><dt>Συνδεδεμένος ως</dt><dd>${esc(state.email || "")}</dd><dt>Συγχρονισμός</dt><dd>${esc(syncText())}</dd></dl></div></section>
-  <section class="section"><h2>Γλώσσα φωνής</h2><div class="chips">${vchip("el-GR", "Ελληνικά")}${vchip("en-US", "English")}</div><p class="muted small">Η γλώσσα που ακούει το μικρόφωνο του Talk. Ο Jarvis καταλαβαίνει και τις δύο.</p></section>
-  <section class="section"><h2>«Hey Siri, Jarvis»</h2><div class="panel siri-steps"><p class="small">Με μία φράση ο Jarvis ανοίγει σε λειτουργία αυτοκινήτου, με την ερώτησή σου ήδη σταλμένη. Φτιάξε μία φορά τη συντόμευση:</p>
-    <ol class="small"><li>Άνοιξε την εφαρμογή <b>Συντομεύσεις</b> (Shortcuts) και πάτα <b>+</b>.</li><li>Πρόσθεσε <b>Υπαγόρευση κειμένου</b> (Dictate Text), γλώσσα Ελληνικά.</li><li>Πρόσθεσε <b>Κωδικοποίηση URL</b> (URL Encode).</li><li>Πρόσθεσε <b>Άνοιγμα URL</b> (Open URL) με αυτή τη διεύθυνση και στο τέλος το αποτέλεσμα της κωδικοποίησης:<code class="siri-url">${esc(location.origin + location.pathname)}#car?q=</code></li><li>Ονόμασε τη συντόμευση <b>Jarvis</b>.</li></ol>
-    <p class="small">Μετά πες <b>«Hey Siri, Jarvis»</b>, πες την ερώτησή σου, και ο Jarvis θα σου απαντήσει φωναχτά. Την πρώτη φορά συνδέσου στο Safari και επίτρεψε το μικρόφωνο (Ρυθμίσεις → Safari → Μικρόφωνο → Να επιτρέπεται).</p>
+  <section class="section"><h2>Γλώσσα φωνής</h2><div class="chips">${vchip("el-GR", "Ελληνικά")}${vchip("en-US", "English")}</div><p class="muted small">Η γλώσσα που ακούει το μικρόφωνο του Talk. Ο B1ble καταλαβαίνει και τις δύο.</p></section>
+  <section class="section"><h2>«Hey Siri, Bible»</h2><div class="panel siri-steps"><p class="small">Με μία φράση ο B1ble ανοίγει σε λειτουργία αυτοκινήτου, με την ερώτησή σου ήδη σταλμένη. Φτιάξε μία φορά τη συντόμευση:</p>
+    <ol class="small"><li>Άνοιξε την εφαρμογή <b>Συντομεύσεις</b> (Shortcuts) και πάτα <b>+</b>.</li><li>Πρόσθεσε <b>Υπαγόρευση κειμένου</b> (Dictate Text), γλώσσα Ελληνικά.</li><li>Πρόσθεσε <b>Κωδικοποίηση URL</b> (URL Encode).</li><li>Πρόσθεσε <b>Άνοιγμα URL</b> (Open URL) με αυτή τη διεύθυνση και στο τέλος το αποτέλεσμα της κωδικοποίησης:<code class="siri-url">${esc(location.origin + location.pathname)}#car?q=</code></li><li>Ονόμασε τη συντόμευση <b>Bible</b> (όπως το προφέρεις, για να το καταλαβαίνει η Siri).</li></ol>
+    <p class="small">Μετά πες <b>«Hey Siri, Bible»</b>, πες την ερώτησή σου, και ο B1ble θα σου απαντήσει φωναχτά. Την πρώτη φορά συνδέσου στο Safari και επίτρεψε το μικρόφωνο (Ρυθμίσεις → Safari → Μικρόφωνο → Να επιτρέπεται).</p>
     <div class="row-actions"><button class="btn small" data-action="copy-car-link">Αντιγραφή διεύθυνσης</button><button class="btn small" data-action="car">Δοκίμασε τη λειτουργία αυτοκινήτου</button></div></div></section>
   <section class="section"><h2>Αντίγραφο ασφαλείας</h2><p class="muted small">Κατέβασε όλα τα δεδομένα (μαγαζιά, εργασίες, επισκέψεις, καταλόγους) σε ένα αρχείο. Οι φωτογραφίες μένουν στον ιδιωτικό σου χώρο.</p><div class="row-actions"><button class="btn" data-action="backup">Λήψη αντιγράφου</button></div></section>
   <div class="row-actions"><button class="btn danger" data-action="sign-out">Αποσύνδεση</button></div>`;
@@ -1180,7 +1180,7 @@ function profileCard(s) {
   return `<section class="section"><div class="panel pcard">
     ${cell("Επόμενη ενέργεια", na ? `<b>${esc(na.text)}</b><small>${na.date ? fmtDate(na.date) : "Χωρίς ημερομηνία"}</small>` : none("Καμία", "Όρισε επίσκεψη ή follow-up"), na && na.late ? "late" : "next")}
     ${cell("Τελευταία επίσκεψη", lv ? `<b>${fmtDate(lv.date)} <span class="muted small">(πριν ${daysBetween(lv.date, todayISO())} μέρες)</span></b><small>${esc(clip(lv.notes, 120))}</small>` : s.lastVisit ? `<b>${fmtDate(s.lastVisit)}</b>` : none("Καμία ακόμα"))}
-    ${cell("Τελευταία παραγγελία", lo ? `<b>${fmtDate(lo.date)}</b><small>${esc(clip(orderText(lo), 120))}</small>` : none("Καμία", "Καταγράφεται με «Επίσκεψη» ή από τον Jarvis"))}
+    ${cell("Τελευταία παραγγελία", lo ? `<b>${fmtDate(lo.date)}</b><small>${esc(clip(orderText(lo), 120))}</small>` : none("Καμία", "Καταγράφεται με «Επίσκεψη» ή από τον B1ble"))}
     ${cell("Επαφή", c ? `<b>${esc(c.name || "Χωρίς όνομα")}${c.role ? ` <span class="muted small">${esc(c.role)}</span>` : ""}</b><small>${c.phone ? `<a href="${esc(telHref(c.phone))}" class="num">${esc(c.phone)}</a>` : ""}${c.phone && c.email ? " · " : ""}${c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : ""}</small>` : `<b class="muted">Καμία</b><small><button class="link small" data-action="shop-tab" data-v="contacts">Πρόσθεσε επαφή</button></small>`)}
     ${cell("Τοποθεσία", addr || hasGeo(s) ? `<b>${esc(addr || "Σημείο GPS")}</b><small><a href="${mapsSearch(s)}" target="_blank" rel="noopener">Άνοιγμα στον χάρτη</a></small>` : none("Χωρίς διεύθυνση", "Πρόσθεσέ τη από την επεξεργασία"))}
   </div></section>`;
@@ -1228,7 +1228,7 @@ function tabBackbar(s) {
   const { rows } = marketShare([s], "all");
   const bb = (s.backbar || []).map((b, i) => ({ b, i })).sort((x, y) => (x.b.category || "").localeCompare(y.b.category || "") || (x.b.company || "").localeCompare(y.b.company || ""));
   return `<section class="section"><div class="section-head"><h2>Φωτογραφίες back bar</h2>${uploadBtn("shop:backbar", "Add photos")}</div>
-    <div class="panel">${gallery(ps, "shops", s.id) || `<div class="empty">Δεν υπάρχουν φωτογραφίες. Φωτογράφισε το back bar και ο Jarvis θα διαβάσει τις ετικέτες.</div>`}</div>${ps.length ? readingPanel("backbar") : ""}</section>
+    <div class="panel">${gallery(ps, "shops", s.id) || `<div class="empty">Δεν υπάρχουν φωτογραφίες. Φωτογράφισε το back bar και ο B1ble θα διαβάσει τις ετικέτες.</div>`}</div>${ps.length ? readingPanel("backbar") : ""}</section>
   <section class="section"><div class="section-head"><h2>Ετικέτες στο back bar</h2>${s.backbarDate ? `<span class="muted small">Μέτρηση ${fmtDate(s.backbarDate)}</span>` : ""}</div>
     <div class="panel table-wrap">${bb.length ? `<table><thead><tr><th>Brand</th><th>Εταιρεία</th><th>Κατηγορία</th><th class="r">Φιάλες</th><th></th></tr></thead><tbody>${bb.map(({ b, i }) => `<tr><td>${esc(b.brand)}</td><td class="muted">${esc(b.company)}</td><td class="muted">${esc(tr(b.category))}</td><td class="r num">${esc(b.facings || 1)}</td><td class="r">${rmButton(`shop:${s.id}:backbar:${i}`)}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">Δεν έχουν καταγραφεί ετικέτες.</div>`}</div>
     ${adder(`backbar:${s.id}`, "Νέα ετικέτα", [{ name: "brand", label: "Brand", required: true, list: "dl-brands" }, { name: "company", label: "Εταιρεία (αυτόματα από τον κατάλογο)", list: "dl-companies" }, { name: "category", label: "Κατηγορία", list: "dl-cats" }, { name: "facings", label: "Φιάλες", type: "number", value: 1, attrs: 'min="1" inputmode="numeric"' }], "Προσθήκη")}</section>
@@ -1310,7 +1310,7 @@ function viewShop(s) {
     <a class="act" href="${mapsDir(s)}" target="_blank" rel="noopener"><span class="act-ic">${ICON.nav}</span>Οδηγίες</a>
     ${phone ? `<a class="act" href="tel:${esc(phone.replace(/\s/g, ""))}"><span class="act-ic">${ICON.phone}</span>Κλήση</a>` : `<button class="act" data-action="shop-tab" data-v="contacts"><span class="act-ic">${ICON.phone}</span>Επαφές</button>`}
     ${canEdit() && s.id ? `<button class="act" data-action="log-visit" data-id="${esc(s.id)}"><span class="act-ic">${ICON.done}</span>Επίσκεψη</button>` : `<button class="act" data-action="shop-tab" data-v="photos"><span class="act-ic">${ICON.camera}</span>Φωτογραφίες</button>`}
-    <button class="act" data-action="talk"><span class="act-ic">${ICON.mic}</span>Jarvis</button>
+    <button class="act" data-action="talk"><span class="act-ic">${ICON.mic}</span>B1ble</button>
   </div>
   <div class="tabbar" role="tablist" aria-label="Ενότητες μαγαζιού">${SHOP_TABS.map(([k, l]) => `<button class="tab" role="tab" data-action="shop-tab" data-v="${k}" aria-selected="${state.shopTab === k}">${l}</button>`).join("")}</div>
   ${tabs[state.shopTab](s)}`;
@@ -1411,10 +1411,10 @@ function render() {
 /* ---------- welcome screen (once per app launch) ---------- */
 const welcome = document.getElementById("welcome");
 const TIPS = [
-  "Βγήκες από ένα μαγαζί; Πάτα «Μίλα» και πες τι έγινε. Ο Jarvis γράφει την επίσκεψη και τις εργασίες.",
-  "Φωτογράφισε το back bar και ο Jarvis μετράει τις ετικέτες για το μερίδιο αγοράς.",
+  "Βγήκες από ένα μαγαζί; Πάτα «Μίλα» και πες τι έγινε. Ο B1ble γράφει την επίσκεψη και τις εργασίες.",
+  "Φωτογράφισε το back bar και ο B1ble μετράει τις ετικέτες για το μερίδιο αγοράς.",
   "Στο «Κοντά μου» βλέπεις τα πιο κοντινά μαγαζιά από εκεί που βρίσκεσαι.",
-  "Ρώτα τον Jarvis: «Ποια μαγαζιά στην Πλάκα δεν έχω επισκεφτεί αυτόν τον μήνα;»",
+  "Ρώτα τον B1ble: «Ποια μαγαζιά στην Πλάκα δεν έχω επισκεφτεί αυτόν τον μήνα;»",
   "Στην Ατζέντα βλέπεις μέρα με τη μέρα επισκέψεις και εργασίες.",
 ];
 function showWelcome() {
@@ -1443,7 +1443,7 @@ function closeWelcome(then) {
 welcome.addEventListener("click", (ev) => { const b = ev.target.closest("[data-wl]"); if (b) closeWelcome(b.dataset.wl === "talk" ? openTalk : null); });
 
 function renderChrome() {
-  let title = TITLES[state.view] || "Jarvis", eyebrow = "", back = !!PARENT[state.view], actions = "";
+  let title = TITLES[state.view] || "B1ble", eyebrow = "", back = !!PARENT[state.view], actions = "";
   if (state.shopId) {
     const s = state.shopId === "new" ? null : shopById(state.shopId);
     back = true;
@@ -1451,7 +1451,7 @@ function renderChrome() {
     else if (state.editing) { title = "Επεξεργασία"; eyebrow = s ? s.name : ""; }
     else { title = "Μαγαζί"; if (s && canEdit()) actions = iconBtn("edit", "Επεξεργασία", ICON.edit); }
   } else if (state.catId) { const c = catById(state.catId); title = c ? c.company : "Κατάλογος"; eyebrow = "Κατάλογος"; back = true; }
-  else if (state.view === "today") { eyebrow = "Ο βοηθός πωλήσεών σου"; title = "J.A.R.V.I.S."; const n = urgentCount(); actions = `<button class="icon-btn bell" data-action="go" data-v="alerts" aria-label="Ειδοποιήσεις${n ? ": " + n : ""}">${ICON.bell}${n ? `<span class="badge">${n > 9 ? "9+" : n}</span>` : ""}</button>` + iconBtn("go", "Ρυθμίσεις", ICON.gear, "settings"); }
+  else if (state.view === "today") { eyebrow = "Ο βοηθός πωλήσεών σου"; title = "B1BLE"; const n = urgentCount(); actions = `<button class="icon-btn bell" data-action="go" data-v="alerts" aria-label="Ειδοποιήσεις${n ? ": " + n : ""}">${ICON.bell}${n ? `<span class="badge">${n > 9 ? "9+" : n}</span>` : ""}</button>` + iconBtn("go", "Ρυθμίσεις", ICON.gear, "settings"); }
   else if (state.view === "route") actions = iconBtn("route-locate", "Πού βρίσκομαι", ICON.locate);
   else if (state.view === "shops") actions = iconBtn("go", "Χάρτης", ICON.map, "map") + (canEdit() ? iconBtn("new-shop", "Νέο μαγαζί", ICON.plus) : "");
   else if (state.view === "map") actions = iconBtn("locate-me", "Πού βρίσκομαι", ICON.locate);
@@ -1704,9 +1704,9 @@ function renderLog() {
   logRoot.innerHTML = `<div class="sheet-bg" data-log="bg"><form class="sheet log-sheet" data-form="log" role="dialog" aria-label="Ολοκλήρωση επίσκεψης" novalidate>
     <div class="section-head"><h2>Ολοκλήρωση επίσκεψης</h2><span class="muted small">${esc(s.name)}</span></div>
     <div class="panel voice-fill"><div class="inline-form">
-      <label class="field" for="log-say">Πες ή γράψε τι έγινε και ο Jarvis συμπληρώνει τα πεδία. Τα ελέγχεις πριν την αποθήκευση.</label>
+      <label class="field" for="log-say">Πες ή γράψε τι έγινε και ο B1ble συμπληρώνει τα πεδία. Τα ελέγχεις πριν την αποθήκευση.</label>
       <textarea id="log-say" rows="3" placeholder="π.χ. Είδα τον Νίκο. Μιλήσαμε για Mythos και Fix. Παρήγγειλε 10 κιβώτια Fix. Ο ανταγωνισμός του έφερε νέο ψυγείο. Να του πάω τιμοκατάλογο την Παρασκευή."></textarea>
-      <div class="row-actions">${Rec ? `<button type="button" class="btn small ${L.listening ? "danger" : ""}" data-log="mic">${ICON.mic} ${L.listening ? "Σε ακούω… πάτα για τέλος" : "Μίλα"}</button>` : ""}<button type="button" class="btn small primary" data-log="fill" ${L.busy ? "disabled" : ""}>${L.busy ? "Ο Jarvis συμπληρώνει…" : "✨ Συμπλήρωση πεδίων"}</button></div>
+      <div class="row-actions">${Rec ? `<button type="button" class="btn small ${L.listening ? "danger" : ""}" data-log="mic">${ICON.mic} ${L.listening ? "Σε ακούω… πάτα για τέλος" : "Μίλα"}</button>` : ""}<button type="button" class="btn small primary" data-log="fill" ${L.busy ? "disabled" : ""}>${L.busy ? "Ο B1ble συμπληρώνει…" : "✨ Συμπλήρωση πεδίων"}</button></div>
       ${L.msg ? `<p class="small ${L.msgOk ? "ok-text" : "bad-text"}" role="status">${esc(L.msg)}</p>` : ""}
     </div></div>
     <div class="grid2">${f("date", "Ημερομηνία", "date", { value: t, required: true })}${f("outcome", "Αποτέλεσμα", "select", { options: OUTCOMES })}</div>
@@ -1752,7 +1752,7 @@ async function saveVisit(s, x, stamp, source) {
 async function logFill() {
   const L = state.log, s = shopById(L.id), say = document.getElementById("log-say"), text = say ? say.value.trim() : "";
   if (!text) { L.msg = "Πες ή γράψε πρώτα τι έγινε."; L.msgOk = false; renderLog(); return; }
-  if (!state.sample) { L.msg = "Ο Jarvis δεν είναι διαθέσιμος τώρα. Συμπλήρωσε τα πεδία με το χέρι."; L.msgOk = false; renderLog(); return; }
+  if (!state.sample) { L.msg = "Ο B1ble δεν είναι διαθέσιμος τώρα. Συμπλήρωσε τα πεδία με το χέρι."; L.msgOk = false; renderLog(); return; }
   const keep = logValues(logRoot.querySelector("form")), keepFd = new FormData(logRoot.querySelector("form"));
   const redraw = () => { renderLog(); restoreForm(keepFd); document.getElementById("log-say").value = text; };
   L.busy = true; L.msg = ""; L.say = text; redraw();
@@ -1819,11 +1819,11 @@ function toast(msg) {
   clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove("on"), 3200);
 }
 
-/* ---------- Talk to Jarvis ---------- */
+/* ---------- Talk to B1ble ---------- */
 const talkRoot = document.getElementById("talk-root");
 let talkCtl = null;
-/* Everything Jarvis may answer from. Records carry ids (v: visit, t: task, o: order, s: shop) so answers can cite them. */
-/* ---------- picking what Jarvis needs to see (works with hundreds of shops) ---------- */
+/* Everything B1ble may answer from. Records carry ids (v: visit, t: task, o: order, s: shop) so answers can cite them. */
+/* ---------- picking what B1ble needs to see (works with hundreds of shops) ---------- */
 const GR_LAT = { α: "a", β: "v", γ: "g", δ: "d", ε: "e", ζ: "z", η: "i", θ: "th", ι: "i", κ: "k", λ: "l", μ: "m", ν: "n", ξ: "x", ο: "o", π: "p", ρ: "r", σ: "s", ς: "s", τ: "t", υ: "y", φ: "f", χ: "ch", ψ: "ps", ω: "o" };
 /* A loose Latin spelling, so "Ταβέρνα Θάλασσα" and "Taverna Thalassa" compare equal. */
 const loose = (x) => norm(x).replace(/[α-ω]/g, (c) => GR_LAT[c] || c).replace(/ks/g, "x").replace(/mp/g, "b").replace(/ch/g, "h").replace(/th/g, "t").replace(/ph/g, "f").replace(/[yw]/g, (c) => c === "y" ? "i" : "o").replace(/ou/g, "u").replace(/([a-z])\1/g, "$1").replace(/[^a-z0-9]+/g, " ").trim();
@@ -1886,14 +1886,14 @@ function talkPrompt(text, opts = {}) {
   const companies = [...new Set(state.catalogues.map((c) => c.company))];
   const brandMap = Object.entries(brandIndex()).slice(0, 400).map(([b, v]) => `${b} = ${v.company}`).join("; ");
   const histArr = opts.history || (state.talk && state.talk.history) || [];
-  const hist = histArr.map((h) => `Rep: ${h.q}\nJarvis: ${h.a}`).join("\n\n");
+  const hist = histArr.map((h) => `Rep: ${h.q}\nB1ble: ${h.a}`).join("\n\n");
   const fullIds = relevantShops(text, cur && cur.id, histArr), fullSet = new Set(fullIds);
   const others = state.shops.filter((s) => !fullSet.has(s.id));
   const horizon = addDays(todayISO(), 14);
   const allOpen = state.tasks.filter((t) => !t.done).sort((a, b) => (a.due || "9999").localeCompare(b.due || "9999"));
   const pickTasks = allOpen.filter((t) => fullSet.has(t.shopId) || !t.due || t.due <= horizon).slice(0, 120);
   const openTasks = pickTasks.map((t) => ({ id: "t:" + t.id, title: t.title, due: t.due, shop: (shopById(t.shopId) || {}).name || "", shopId: t.shopId ? "s:" + t.shopId : "" }));
-  return `You are Jarvis, the field assistant of a HoReCa sales rep in Greece who visits cafés, bars, restaurants and hotels. The rep just spoke (dictated, so expect typos, Greek names in Latin or Greek letters, and loose phrasing). Today is ${todayISO()}.
+  return `You are B1ble, the field assistant of a HoReCa sales rep in Greece who visits cafés, bars, restaurants and hotels. The rep just spoke (dictated, so expect typos, Greek names in Latin or Greek letters, and loose phrasing). Today is ${todayISO()}.
 ${state.here && Date.now() - state.here.at < 10 * 60000 ? `The rep's phone GPS says they are at ${state.here.lat.toFixed(5)}, ${state.here.lng.toFixed(5)}. Shops with lat/lng nearby (under ~80 m) are likely the one they mean if they don't name it.` : ""}
 ${cur ? `The rep currently has this shop open, so assume they mean it unless they name another: ${cur.name} (id ${cur.id}).` : ""}
 
@@ -2016,15 +2016,15 @@ function renderTalk() {
       <div class="panel"><ul class="change-list">${lines.length ? lines.map(([k, v]) => `<li><b>${esc(k)}</b><span>${esc(v)}</span></li>`).join("") : `<li>Δεν υπάρχει κάτι να αποθηκευτεί. Δοκίμασε ξανά λέγοντας το όνομα του μαγαζιού και τι έγινε.</li>`}</ul></div>
       ${!t.result.shopId && !t.result.newShop && lines.length ? `<div class="banner">Δεν κατάλαβα ποιο μαγαζί είναι. Πες το όνομα του μαγαζιού και δοκίμασε ξανά.</div>` : ""}
       <div class="row-actions">${lines.length && (t.result.shopId || t.result.newShop) ? `<button class="btn primary" data-talk="save">Αποθήκευση όλων</button>` : ""}<button class="btn" data-talk="again">Αλλαγή</button><button class="btn" data-talk="close">Απόρριψη</button></div>`;
-  } else body = `<button class="car-entry" data-talk="car">${CAR_ICON}<span><b>Λειτουργία αυτοκινήτου</b><small>Ο Jarvis μιλάει και σε ακούει, χωρίς να αγγίζεις το κινητό</small></span></button>${talkPresets()}${Rec ? `<button class="mic-btn ${t.listening ? "on" : ""}" data-talk="mic" aria-pressed="${!!t.listening}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-2.1A7 7 0 0 0 19 12z"/></svg>${t.listening ? "Σε ακούω… πάτα για τέλος" : "Πάτα και μίλα"}</button>` : ""}
+  } else body = `<button class="car-entry" data-talk="car">${CAR_ICON}<span><b>Λειτουργία αυτοκινήτου</b><small>Ο B1ble μιλάει και σε ακούει, χωρίς να αγγίζεις το κινητό</small></span></button>${talkPresets()}${Rec ? `<button class="mic-btn ${t.listening ? "on" : ""}" data-talk="mic" aria-pressed="${!!t.listening}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-2.1A7 7 0 0 0 19 12z"/></svg>${t.listening ? "Σε ακούω… πάτα για τέλος" : "Πάτα και μίλα"}</button>` : ""}
     <label class="field" for="talk-text">${Rec ? "Ή γράψε. " : "Πάτα το μικρόφωνο στο πληκτρολόγιο και μίλα. "}Πες το όνομα του μαγαζιού, τι έγινε, τι έχουν και τι υποσχέθηκες.</label>
     <textarea id="talk-text" placeholder="π.χ. Μόλις έφυγα από την Ταβέρνα Θάλασσα στο Θησείο. Είδα τη Μαρία, την υπεύθυνη, το κινητό της είναι 694… Παρήγγειλαν 20 βαρέλια. Οι ομπρέλες μας είναι σκισμένες, θέλουν 4 καινούργιες την επόμενη εβδομάδα.">${esc(t.text || "")}</textarea>
     ${t.error ? `<div class="banner" role="alert">${esc(t.error)}</div>` : ""}
-    <div class="row-actions"><button class="btn primary" data-talk="send">Στείλε στον Jarvis</button><button class="btn" data-talk="close">Ακύρωση</button></div>`;
-  talkRoot.innerHTML = `<div class="sheet-bg"><div class="sheet" role="dialog" aria-label="Μίλα στον Jarvis"><div class="section-head"><h2>Μίλα στον Jarvis</h2>${state.shopId && shopById(state.shopId) ? `<span class="muted small">${esc(shopById(state.shopId).name)}</span>` : ""}</div>${body}</div></div>`;
+    <div class="row-actions"><button class="btn primary" data-talk="send">Στείλε στον B1ble</button><button class="btn" data-talk="close">Ακύρωση</button></div>`;
+  talkRoot.innerHTML = `<div class="sheet-bg"><div class="sheet" role="dialog" aria-label="Μίλα στον B1ble"><div class="section-head"><h2>Μίλα στον B1ble</h2>${state.shopId && shopById(state.shopId) ? `<span class="muted small">${esc(shopById(state.shopId).name)}</span>` : ""}</div>${body}</div></div>`;
   const ta = document.getElementById("talk-text"); if (ta && !t.result && !t.listening && !Rec) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
 }
-const sampleErr = (e) => ({ not_granted: "Ο Jarvis χρειάζεται άδεια για να χρησιμοποιήσει το Claude. Πάτα ξανά Αποστολή και επίλεξε Allow.", rate_limited: "Πολλά αιτήματα μαζί. Περίμενε ένα λεπτό και δοκίμασε ξανά.", invalid_json: "Δεν το κατάλαβα. Δοκίμασε να το πεις πιο απλά.", prompt_too_large: "Τα δεδομένα σου έγιναν πολύ μεγάλα για μία αποστολή. Πες το στο Claude στη συνομιλία.", session_expired: "Αποσυνδέθηκες. Άνοιξε ξανά την εφαρμογή.", offline: "Είσαι εκτός σύνδεσης. Τα λόγια σου μένουν εδώ, στείλ' τα όταν έχεις σήμα.", ai_error: "Ο Jarvis δεν μπόρεσε να συνδεθεί με το Claude. Έλεγξε τη σύνδεση και δοκίμασε ξανά.", refused: "Το Claude αρνήθηκε αυτό το αίτημα. Δοκίμασε να το διατυπώσεις αλλιώς.", server_old: "Αυτό χρειάζεται την ενημερωμένη έκδοση του jarvis-ai στο Supabase. Ακολούθησε τα βήματα που σου έστειλα και δοκίμασε ξανά." }[e && e.code] || "Κάτι πήγε στραβά. Δοκίμασε ξανά.");
+const sampleErr = (e) => ({ not_granted: "Ο B1ble χρειάζεται άδεια για να χρησιμοποιήσει το Claude. Πάτα ξανά Αποστολή και επίλεξε Allow.", rate_limited: "Πολλά αιτήματα μαζί. Περίμενε ένα λεπτό και δοκίμασε ξανά.", invalid_json: "Δεν το κατάλαβα. Δοκίμασε να το πεις πιο απλά.", prompt_too_large: "Τα δεδομένα σου έγιναν πολύ μεγάλα για μία αποστολή. Πες το στο Claude στη συνομιλία.", session_expired: "Αποσυνδέθηκες. Άνοιξε ξανά την εφαρμογή.", offline: "Είσαι εκτός σύνδεσης. Τα λόγια σου μένουν εδώ, στείλ' τα όταν έχεις σήμα.", ai_error: "Ο B1ble δεν μπόρεσε να συνδεθεί με το Claude. Έλεγξε τη σύνδεση και δοκίμασε ξανά.", refused: "Το Claude αρνήθηκε αυτό το αίτημα. Δοκίμασε να το διατυπώσεις αλλιώς.", server_old: "Αυτό χρειάζεται την ενημερωμένη έκδοση του jarvis-ai στο Supabase. Ακολούθησε τα βήματα που σου έστειλα και δοκίμασε ξανά." }[e && e.code] || "Κάτι πήγε στραβά. Δοκίμασε ξανά.");
 async function talkSend() {
   const t = state.talk; const ta = document.getElementById("talk-text");
   t.text = ta ? ta.value.trim() : t.text; t.error = "";
@@ -2085,7 +2085,7 @@ const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
 let rec = null;
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 const MIC_ERRORS = {
-  "not-allowed": "Ο Jarvis δεν έχει άδεια για το μικρόφωνο. Επέτρεψέ το στις ρυθμίσεις του κινητού ή πάτα το 🎤 στο πληκτρολόγιο.",
+  "not-allowed": "Ο B1ble δεν έχει άδεια για το μικρόφωνο. Επέτρεψέ το στις ρυθμίσεις του κινητού ή πάτα το 🎤 στο πληκτρολόγιο.",
   "service-not-allowed": "Το κινητό σου δεν επιτρέπει αναγνώριση φωνής σε εγκατεστημένες εφαρμογές web. Πάτα στο κουτί από κάτω και χρησιμοποίησε το 🎤 του πληκτρολογίου.",
   "audio-capture": "Δεν βρέθηκε μικρόφωνο. Πάτα στο κουτί από κάτω και χρησιμοποίησε το 🎤 του πληκτρολογίου.",
   "network": "Η αναγνώριση φωνής θέλει ίντερνετ. Έλεγξε τη σύνδεση ή χρησιμοποίησε το 🎤 του πληκτρολογίου.",
@@ -2126,13 +2126,13 @@ talkRoot.addEventListener("click", (ev) => {
 function openTalk() { state.talk = { open: true, text: "" }; renderTalk(); locate().catch(() => {}); }
 document.getElementById("fab").addEventListener("click", openTalk);
 
-/* ---------- car mode: hands-free; Jarvis speaks its answers and listens again ---------- */
+/* ---------- car mode: hands-free; B1ble speaks its answers and listens again ---------- */
 const carRoot = document.createElement("div"); carRoot.id = "car-root"; document.body.appendChild(carRoot);
 const TTS = window.speechSynthesis || null;
 let car = null, carRec = null, carLock = null, carTimer = null;
 const CAR_YES = /^(ναι|οκ|οκει|ok|okay|ενταξει|σωστα|αποθηκευσε|σωσε|βεβαιως|φυσικα|μαλιστα|yes|yeah|yep|save|παμε|κανε το|ανοιξε|θελω)(?=\s|$)/;
 const CAR_NO = /^(οχι|ακυρο|ακυρωσε|ασ το|ασε|μην|no|nope|cancel|αλλαξε|τιποτα)(?=\s|$)/;
-const carClean = (raw) => norm(raw).replace(/[.,!;?·«»"':]/g, " ").replace(/\s+/g, " ").trim().replace(/^(hey |hei |ει |ε )?(jarvis|τζαρβις|τζαρβης|ζαρβις|τζαρβι)(?=\s|$) ?/, "").trim();
+const carClean = (raw) => norm(raw).replace(/[.,!;?·«»"':]/g, " ").replace(/\s+/g, " ").trim().replace(/^(hey |hei |ει |ε )?(b1ble|bible|baibl|baibol|μπαιμπλ|μπαιμπολ|μπαιμπελ|βιβλος|jarvis|τζαρβις|τζαρβης)(?=\s|$) ?/, "").trim();
 function carVoice() {
   if (!TTS) return null;
   const L = state.voiceLang.toLowerCase(), v = TTS.getVoices();
