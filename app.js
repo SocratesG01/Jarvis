@@ -1136,6 +1136,7 @@ function viewSettings() {
     <div class="row-actions"><button class="btn" data-action="cal-export">Λήψη επισκέψεων & εργασιών (.ics)</button></div><p class="muted small">Το αρχείο .ics ανοίγει σε Google Calendar, Outlook ή iPhone και περνάει όλες τις προγραμματισμένες επισκέψεις και εργασίες.</p></section>` : "";
   return `${profile}${cal}<section class="section"><h2>Λογαριασμός</h2><div class="panel"><dl class="kv"><dt>Συνδεδεμένος ως</dt><dd>${esc(state.email || "")}</dd><dt>Συγχρονισμός</dt><dd>${esc(syncText())}</dd></dl></div></section>
   <section class="section"><h2>Γλώσσα φωνής</h2><div class="chips">${vchip("el-GR", "Ελληνικά")}${vchip("en-US", "English")}</div><p class="muted small">Η γλώσσα που ακούει το μικρόφωνο του Talk. Ο B1ble καταλαβαίνει και τις δύο.</p></section>
+  <section class="section"><h2>Η φωνή του B1ble</h2><div class="chips"><button class="chip" data-action="b1-voice" data-v="on" aria-pressed="${bVoice.mine}">Φωνή B1ble</button><button class="chip" data-action="b1-voice" data-v="off" aria-pressed="${!bVoice.mine}">Φωνή κινητού</button><button class="chip" data-action="b1-voice-test">${ic('<path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 9a4 4 0 0 1 0 6"/>')} Δοκιμή</button></div><p class="muted small">Ο B1ble σε καλωσορίζει και μιλάει στη λειτουργία αυτοκινήτου με τη δική του φωνή (ElevenLabs). Χωρίς σήμα μιλάει με τη φωνή του κινητού.${bVoice.off ? " Η φωνή B1ble δεν είναι διαθέσιμη αυτή τη στιγμή, οπότε μιλάει η φωνή του κινητού." : ""}</p></section>
   <section class="section"><h2>«Hey Siri, Bible»</h2><div class="panel siri-steps"><p class="small">Με μία φράση ο B1ble ανοίγει σε λειτουργία αυτοκινήτου, με την ερώτησή σου ήδη σταλμένη. Φτιάξε μία φορά τη συντόμευση:</p>
     <ol class="small"><li>Άνοιξε την εφαρμογή <b>Συντομεύσεις</b> (Shortcuts) και πάτα <b>+</b>.</li><li>Πρόσθεσε <b>Υπαγόρευση κειμένου</b> (Dictate Text), γλώσσα Ελληνικά.</li><li>Πρόσθεσε <b>Κωδικοποίηση URL</b> (URL Encode).</li><li>Πρόσθεσε <b>Άνοιγμα URL</b> (Open URL) με αυτή τη διεύθυνση και στο τέλος το αποτέλεσμα της κωδικοποίησης:<code class="siri-url">${esc(location.origin + location.pathname)}#car?q=</code></li><li>Ονόμασε τη συντόμευση <b>Bible</b> (όπως το προφέρεις, για να το καταλαβαίνει η Siri).</li></ol>
     <p class="small">Μετά πες <b>«Hey Siri, Bible»</b>, πες την ερώτησή σου, και ο B1ble θα σου απαντήσει φωναχτά. Την πρώτη φορά συνδέσου στο Safari και επίτρεψε το μικρόφωνο (Ρυθμίσεις → Safari → Μικρόφωνο → Να επιτρέπεται).</p>
@@ -1421,6 +1422,7 @@ function showWelcome() {
   try { if (sessionStorage.getItem("jarvis-welcomed")) return; } catch {}
   document.getElementById("wl-tip").textContent = TIPS[new Date().getDate() % TIPS.length];
   welcome.hidden = false; renderWelcome();
+  bVoice.welcome = true; playWelcome().catch(() => {}); // most phones wait for the first tap; the pointerdown handler plays it then
 }
 function renderWelcome() {
   if (welcome.hidden) return;
@@ -1562,6 +1564,8 @@ async function onAction(ev) {
   else if (a === "settings") nav("settings");
   else if (a === "sign-out") { await sb.auth.signOut(); location.reload(); }
   else if (a === "backup") { const data = JSON.stringify({ exportedAt: new Date().toISOString(), docs: store.exportAll() }, null, 1); const a2 = document.createElement("a"); a2.href = URL.createObjectURL(new Blob([data], { type: "application/json" })); a2.download = `jarvis-backup-${todayISO()}.json`; a2.click(); }
+  else if (a === "b1-voice") { bVoice.mine = el.dataset.v === "on"; bVoice.off = false; try { localStorage.setItem("jarvis-b1-voice", bVoice.mine ? "on" : "off"); } catch {} render(); }
+  else if (a === "b1-voice-test") { bVoice.off = false; speakOnce(`Γεια σου${state.settings.myName ? " " + state.settings.myName : ""}. Είμαι ο B1ble. Πού πάμε σήμερα;`); setTimeout(render, 6000); }
   else if (a === "voice-lang") { state.voiceLang = el.dataset.v; try { localStorage.setItem("jarvis-voice-lang", state.voiceLang); } catch {} render(); }
   else if (a === "read-photos") readPhotos(el.dataset.v);
   else if (a === "read-save") { el.disabled = true; readSave(el.dataset.v); }
@@ -2126,6 +2130,55 @@ talkRoot.addEventListener("click", (ev) => {
 function openTalk() { state.talk = { open: true, text: "" }; renderTalk(); locate().catch(() => {}); }
 document.getElementById("fab").addEventListener("click", openTalk);
 
+/* ---------- B1ble's own voice (ElevenLabs, through the b1ble-voice server function) ----------
+   One audio element, unlocked by the first tap (iPhone only lets a page play sound after a tap),
+   reused for every answer. If the voice can't be reached, the phone's own voice speaks instead. */
+const SILENT_MP3 = "data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjE2LjEwMAAAAAAAAAAAAAAA//NwwAAAAAAAAAAAAEluZm8AAAAPAAAACAAAA/oAR0dHR0dHR0dHR0dHYmJiYmJiYmJiYmJifHx8fHx8fHx8fHx8fJaWlpaWlpaWlpaWlrGxsbGxsbGxsbGxsbHLy8vLy8vLy8vLy8vl5eXl5eXl5eXl5eXl////////////////AAAAAExhdmM2MC4zMQAAAAAAAAAAAAAAACQC1AAAAAAAAAP6yysejgAAAAAAAAAAAAAAAAD/80DEAAAAA0gAAAAATEFNRTMuMTAwVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsRbAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQMSkAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//NCxKMAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//NAxKQAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/80LEowAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/80DEpAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsSjAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVQ==";
+const bVoice = { el: null, unlocked: false, off: false, url: "", text: "", ctl: null, welcome: false };
+try { bVoice.mine = localStorage.getItem("jarvis-b1-voice") !== "off"; } catch { bVoice.mine = true; }
+const voiceOn = () => bVoice.mine && !bVoice.off && !!(state.sample && state.sample.voice);
+function voiceEl() { if (!bVoice.el) { bVoice.el = new Audio(); bVoice.el.preload = "auto"; bVoice.el.setAttribute("playsinline", ""); } return bVoice.el; }
+function playWelcome() {
+  if (!bVoice.mine) return Promise.resolve();
+  const a = voiceEl(); a.onended = a.onerror = null; a.src = "audio/welcome.mp3"; a.volume = 1;
+  return a.play().then(() => { bVoice.unlocked = true; bVoice.welcome = false; });
+}
+// The first tap anywhere unlocks sound for the rest of the session (and plays the welcome, if it was waiting for one).
+document.addEventListener("pointerdown", () => {
+  if (bVoice.unlocked) return;
+  if (bVoice.welcome && !welcome.hidden) { playWelcome().catch(() => {}); return; }
+  const a = voiceEl(); if (a.src && !a.paused) return;
+  a.src = SILENT_MP3; a.play().then(() => { bVoice.unlocked = true; }).catch(() => {});
+}, { capture: true });
+function stopVoice() {
+  if (bVoice.ctl) { bVoice.ctl.abort(); bVoice.ctl = null; }
+  if (bVoice.el) { bVoice.el.onended = bVoice.el.onerror = null; try { bVoice.el.pause(); } catch {} }
+}
+/* Speaks text in B1ble's voice. h.live() says whether this is still wanted; h.end / h.locked / h.fail report back. */
+function playVoice(text, h) {
+  stopVoice();
+  const go = () => {
+    if (!h.live()) return;
+    const a = voiceEl(); a.src = bVoice.url;
+    a.onended = () => h.live() && h.end(); a.onerror = () => h.live() && h.fail();
+    const p = a.play(); if (p) p.then(() => { bVoice.unlocked = true; }).catch((e) => { if (!h.live()) return; e && e.name === "NotAllowedError" ? h.locked() : h.fail(); });
+  };
+  if (bVoice.url && bVoice.text === text) { go(); return; } // same words again ("repeat", tap to hear): no new request
+  const ctl = bVoice.ctl = new AbortController();
+  state.sample.voice(text, state.voiceLang, ctl.signal).then((blob) => {
+    if (ctl.signal.aborted) return;
+    bVoice.ctl = null;
+    if (bVoice.url) URL.revokeObjectURL(bVoice.url);
+    bVoice.url = URL.createObjectURL(blob); bVoice.text = text; go();
+  }).catch((e) => {
+    if (ctl.signal.aborted || (e && e.code === "cancelled")) return;
+    bVoice.ctl = null;
+    // Not set up yet, out of credits or not allowed: use the phone's voice for the rest of this session.
+    if (e && /no_key|not_allowed|elevenlabs_40[1-3]/.test(e.code || "")) bVoice.off = true;
+    if (h.live()) h.fail(e);
+  });
+}
+
 /* ---------- car mode: hands-free; B1ble speaks its answers and listens again ---------- */
 const carRoot = document.createElement("div"); carRoot.id = "car-root"; document.body.appendChild(carRoot);
 const TTS = window.speechSynthesis || null;
@@ -2146,11 +2199,20 @@ function carSay(text, next) {
   const id = car.sayId = (car.sayId || 0) + 1;
   car.said = text; car.phase = "speaking"; car.next = next || null; renderCar();
   const done = () => { if (!car || car.sayId !== id) return; car.sayId++; clearTimeout(carTimer); (next || carListen)(); };
+  const locked = () => { if (!car || car.sayId !== id || started) return; clearTimeout(carTimer); stopVoice(); TTS && TTS.cancel(); car.phase = "tap"; renderCar(); };
+  let started = false;
+  if (text && voiceOn()) {
+    carTimer = setTimeout(done, 20000 + String(text).length * 120); // backstop: request + playback
+    playVoice(String(text), { live: () => !!car && car.sayId === id, end: () => setTimeout(done, 200), locked, fail: () => { clearTimeout(carTimer); phoneSay(); } });
+    return;
+  }
+  phoneSay();
+  function phoneSay() {
+  if (!car || car.sayId !== id) return;
   if (!TTS || !text) { carTimer = setTimeout(done, Math.min(9000, 1500 + String(text).length * 50)); return; }
   TTS.cancel();
   const parts = String(text).replace(/\s+/g, " ").match(/[^.!;?…]+[.!;?…]*\s*/g) || [String(text)];
-  const voice = carVoice(); let started = false;
-  const locked = () => { if (!car || car.sayId !== id || started) return; clearTimeout(carTimer); TTS.cancel(); car.phase = "tap"; renderCar(); };
+  const voice = carVoice();
   parts.forEach((p, i) => {
     const u = new SpeechSynthesisUtterance(p.trim()); u.lang = state.voiceLang; if (voice) u.voice = voice; u.rate = 1.03;
     u.onstart = () => { started = true; car && (car.ttsOk = true); };
@@ -2159,6 +2221,7 @@ function carSay(text, next) {
   });
   if (!car.ttsOk) setTimeout(locked, 1800);
   carTimer = setTimeout(done, 4000 + String(text).length * 110); // backstop if the phone never reports the end
+  }
 }
 function carListen() {
   if (!car) return;
@@ -2254,7 +2317,7 @@ async function carAsk(text) {
   car.lastAnswer = r.summary ? sum : `${who}. ${sum}`;
   carSay(car.lastAnswer + " Να το αποθηκεύσω;");
 }
-function carStop() { if (!car) return; car.sayId = (car.sayId || 0) + 1; clearTimeout(carTimer); TTS && TTS.cancel(); const r = carRec; carRec = null; try { r && r.abort(); } catch {} }
+function carStop() { if (!car) return; car.sayId = (car.sayId || 0) + 1; clearTimeout(carTimer); stopVoice(); TTS && TTS.cancel(); const r = carRec; carRec = null; try { r && r.abort(); } catch {} }
 function openCar(opts = {}) {
   if (car) { if (opts.q) { carStop(); carAsk(opts.q); } return; }
   if (state.talk) { if (rec && state.talk.listening) rec.stop(); state.talk = null; renderTalk(); }
@@ -2316,7 +2379,15 @@ carRoot.addEventListener("click", (ev) => {
   else if (a === "send") { const ta = document.getElementById("car-text"); const v = ta && ta.value.trim(); if (v) { ta.value = ""; carHandle(v); } }
 });
 /* Read an answer aloud from the normal Talk sheet. */
+let onceId = 0;
 function speakOnce(text) {
+  if (!text) return;
+  TTS && TTS.cancel();
+  const id = ++onceId;
+  if (voiceOn()) { playVoice(String(text), { live: () => id === onceId, end() {}, locked() {}, fail: () => phoneOnce(text) }); return; }
+  phoneOnce(text);
+}
+function phoneOnce(text) {
   if (!TTS || !text) return;
   TTS.cancel(); const voice = carVoice();
   (String(text).replace(/\s+/g, " ").match(/[^.!;?…]+[.!;?…]*\s*/g) || [text]).forEach((p) => { const u = new SpeechSynthesisUtterance(p.trim()); u.lang = state.voiceLang; if (voice) u.voice = voice; TTS.speak(u); });

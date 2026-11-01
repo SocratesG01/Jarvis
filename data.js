@@ -228,9 +228,19 @@ export function makeSample() {
     if (data.error) throw { code: "ics_error", message: data.error };
     return data.ics || "";
   }
+  /* B1ble's ElevenLabs voice, through the b1ble-voice Edge Function (it holds that key). Returns an audio Blob. */
+  async function voice(text, lang, signal) {
+    if (!navigator.onLine) throw { code: "offline" };
+    const aborted = new Promise((_, rej) => signal && signal.addEventListener("abort", () => rej({ code: "cancelled" })));
+    const { data, error } = await Promise.race([sb.functions.invoke("b1ble-voice", { body: { text, lang } }), aborted]);
+    if (error) { let why = ""; try { why = (await error.context.json()).error; } catch {} throw { code: why || "voice_error" }; }
+    if (!(data instanceof Blob) || !data.size) throw { code: "voice_error" };
+    return data;
+  }
   const sample = (prompt, opts) => call(prompt, opts);
   sample.json = async (prompt, opts) => parseJson((await call(prompt, opts)).text);
   sample.ics = ics;
+  sample.voice = voice;
   sample.limits = async () => ({ maxPromptBytes: 900000, images: { maxCount: 6, maxInputBytes: 20 * 1024 * 1024, mediaTypes: ["image/jpeg", "image/png", "image/webp"] } });
   return sample;
 }
