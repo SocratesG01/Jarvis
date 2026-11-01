@@ -136,7 +136,7 @@ function datalists() {
 
 /* ---------- navigation ---------- */
 const TABS = ["today", "shops", "agenda", "more"];
-const PARENT = { map: "more", prospects: "more", market: "more", catalogues: "more", tasks: "agenda", settings: "more", route: "agenda", report: "more", alerts: "today", files: "more", watch: "more", sales: "more" };
+const PARENT = { shops: "today", agenda: "today", more: "today", map: "more", prospects: "more", market: "more", catalogues: "more", tasks: "agenda", settings: "more", route: "agenda", report: "more", alerts: "today", files: "more", watch: "more", sales: "more" };
 const PAGES = [...TABS, ...Object.keys(PARENT)];
 const TITLES = { today: "B1ble", shops: "Μαγαζιά", agenda: "Ατζέντα", more: "Άλλα", map: "Χάρτης", prospects: "Υποψήφιοι", market: "Μερίδιο αγοράς", catalogues: "Κατάλογοι", tasks: "Όλες οι εργασίες", settings: "Ρυθμίσεις", route: "Διαδρομή ημέρας", report: "Εβδομαδιαία αναφορά", alerts: "Ειδοποιήσεις", files: "Αρχεία δουλειάς", watch: "Παρακολούθηση αγοράς", sales: "Πωλήσεις & στόχοι" };
 function nav(view) { if (location.hash.slice(1) === view) go(view); else location.hash = view; }
@@ -346,6 +346,38 @@ function territoryMap() {
   return `<svg class="tm" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><polygon class="tm-sea" points="${sea}"/><g class="tm-roads">${roads}</g>${labels}${dots}</svg>`;
 }
 const dayStarted = () => { try { return localStorage.getItem("jarvis-day") === todayISO(); } catch { return false; } };
+/* Home: the B1ble logo in the middle (tap = talk), the three sections around it. */
+function homeHub(d) {
+  const n = urgentCount();
+  const tasksToday = d.todayTasks.length + d.overdue.length;
+  const R = routeState();
+  const here = state.here && Date.now() - state.here.at < 30 * 60000 ? state.here : null;
+  const chosen = R.ids.map(shopById).filter(Boolean);
+  const stops = R.manual ? chosen : orderStops(chosen.filter(hasGeo), here).concat(chosen.filter((s) => !hasGeo(s)));
+  const nextS = d.started ? stops.find((x) => !d.visited.has(x.id)) : null;
+  const km = nextS && here && hasGeo(nextS) ? distKm(here, nextS) : null;
+  const node = (cls, v, icon, label, sub, badge) => `<button class="hub-node ${cls}" data-action="go" data-v="${v}"><span class="hub-bub">${icon}${badge ? `<span class="hub-badge">${badge > 99 ? "99+" : badge}</span>` : ""}</span><b>${label}</b><small>${sub}</small></button>`;
+  const nextCard = !canEdit() ? "" : nextS
+    ? `<button class="hub-next" data-action="open" data-id="${esc(nextS.id)}"><span class="hub-pin">${ic('<path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>')}</span><span class="grow"><b>Επόμενη στάση: ${esc(nextS.name)}</b><small>${esc([nextS.area, km != null ? (km < 1 ? Math.round(km * 1000) + " m" : km.toFixed(1).replace(".", ",") + " km") : "", `${d.doneN}/${d.todayShops.length || chosen.length} έγιναν`].filter(Boolean).join(" · "))}</small></span><span class="chev">${ICON.chev}</span></button>`
+    : `<button class="hub-next" data-action="start-day"><span class="hub-pin">${d.started ? ICON.route : ICON.play}</span><span class="grow"><b>${d.started ? "Συνέχισε τη μέρα" : "Ξεκίνα τη μέρα μου"}</b><small>${d.started ? (chosen.length ? "Έκανες όλες τις στάσεις. Μπράβο!" : "Δεν έχεις στάσεις σήμερα") : "Ο B1ble φτιάχνει τη διαδρομή με τις προτεραιότητές σου"}</small></span><span class="chev">${ICON.chev}</span></button>`;
+  return `<section class="hub">
+    <div class="hub-top"><div><span class="hub-date">${esc(new Date().toLocaleDateString("el-GR", { weekday: "long", day: "numeric", month: "long" }))}</span><h1 class="hub-hi">${greeting()}${d.name ? `, ${esc(d.name)}` : ""}</h1></div>
+      <div class="hub-tr">${weatherHtml()}<button class="icon-btn bell" data-action="go" data-v="alerts" aria-label="Ειδοποιήσεις${n ? ": " + n : ""}">${ICON.bell}${n ? `<span class="badge">${n > 9 ? "9+" : n}</span>` : ""}</button></div></div>
+    <div class="hub-orbit">
+      <svg class="hub-lines" viewBox="0 0 390 430" preserveAspectRatio="none" aria-hidden="true"><line x1="195" y1="215" x2="66" y2="78"/><line x1="195" y1="215" x2="324" y2="78"/><line x1="195" y1="215" x2="195" y2="380"/></svg>
+      <span class="hub-ring r2"></span><span class="hub-ring r1"></span>
+      <span class="hub-tap">Πάτα και μίλα μου</span>
+      <button class="hub-core" data-action="talk" aria-label="Μίλα στον B1ble"><img src="icons/icon-512.png?v=3" alt=""></button>
+      ${node("n1", "shops", ic('<path d="M3 10l1.5-5h15L21 10"/><path d="M4 10v10h16V10"/><path d="M3 10h18"/><path d="M9 20v-5h6v5"/>'), "Μαγαζιά", plural(d.customers.length, "πελάτης", "πελάτες"))}
+      ${node("n2", "agenda", ic('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'), "Ατζέντα", tasksToday ? `${tasksToday} για σήμερα` : plural(d.todayShops.length, "επίσκεψη", "επισκέψεις"), tasksToday)}
+      ${node("n3", "more", ic('<rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/>'), "Άλλα", "Ρυθμίσεις, κατάλογοι")}
+    </div>
+    ${nextCard}
+    <div class="hub-pills"><button class="hub-pill talk" data-action="talk">${ICON.mic}<span>Μίλα</span></button>${canEdit() ? `<button class="hub-pill" data-action="car">${CAR_ICON}<span>Αυτοκίνητο</span></button>` : ""}</div>
+    <a class="hub-more" href="#today" data-action="hub-scroll">Η μέρα σου ↓</a>
+  </section>
+  <div id="hub-day"></div>`;
+}
 function viewToday() {
   const t = todayISO();
   loadWeather();
@@ -375,19 +407,14 @@ function viewToday() {
   const plan = [...events.map(evRow), ...todayShops.sort((a, b) => visited.has(a.id) - visited.has(b.id)).map(visitRow), ...todayTasks.map(taskRow)];
   const sales = salesSummary();
   return `${banner()}
-  <section class="jx-hero">${NIGHT}
-    <div class="jx-top"><h1 class="jx-hi">${greeting()}${name ? `, <span class="jx-name">${esc(name)}</span>` : ""}</h1>${weatherHtml()}</div>
-    <p class="jx-brief"><b>${esc(new Date().toLocaleDateString("el-GR", { weekday: "long", day: "numeric", month: "long" }))}</b><br>${brief}</p>
-    ${canEdit() ? `<button class="jx-start" data-action="start-day">${started ? ICON.route : ICON.play}<span><b>${started ? "Συνέχισε τη μέρα" : "Ξεκίνα τη μέρα μου"}</b><small>${started ? `${doneN} από ${plural(todayShops.length, "επίσκεψη", "επισκέψεις")} έγιναν` : "Ο B1ble φτιάχνει τη διαδρομή με τις προτεραιότητές σου"}</small></span><span class="chev">${ICON.chev}</span></button>` : ""}
-    ${canEdit() ? `<button class="jx-car" data-action="car">${CAR_ICON}<span>Λειτουργία αυτοκινήτου</span></button>` : ""}
-  </section>
+  ${homeHub({ name, open, todayTasks, overdue, todayShops, doneN, started, customers, visited })}
   <section class="jx-card jx-sched">
     <div class="jx-sched-head"><span class="jx-ic">${ic('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 14h2M12 14h2M8 17h2"/>')}</span><span class="grow"><b>Σήμερα</b><small>${todayShops.length ? `${doneN}/${todayShops.length} επισκέψεις` : "Καμία προγραμματισμένη επίσκεψη"}</small></span><a href="#route" class="link">Διαδρομή ›</a></div>
     <ul class="jx-list">${plan.length ? plan.join("") : `<li class="jx-empty">${art("calendar")}<span>Τίποτα προγραμματισμένο. Πάτα «Ξεκίνα τη μέρα μου» και ο B1ble διαλέγει από τις προτεραιότητες.</span></li>`}</ul>
   </section>
   ${overdue.length ? `<section class="section"><div class="section-head"><h2 class="bad-h">Εκπρόθεσμα follow-ups</h2>${overdue.length > 5 ? `<a href="#tasks" class="link">Όλα (${overdue.length}) ›</a>` : ""}</div><div class="panel"><ul class="list">${overdue.slice(0, 5).map(taskRow).join("")}</ul></div></section>` : ""}
   ${pri.length ? `<section class="section"><div class="section-head"><h2>Προτεραιότητες</h2><span class="muted small">ποιους να δεις πρώτα</span></div><div class="panel"><ul class="list">${pri.map((p) => shopRow(p.s, p.why.join(" · "), null, true)).join("")}</ul></div></section>` : ""}
-  <button class="jx-ask" data-action="talk"><span class="jx-ask-ic">${ic('<path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4 3v-3H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/><path d="M8 10h8M8 13h5"/>')}</span><span class="grow"><b>Ρώτα τον B1BLE</b><small>«Ποιες εκκρεμότητες έχω αυτή την εβδομάδα;»</small></span><span class="chev">${ICON.chev}</span></button>
+  <button class="jx-ask hub-hide" data-action="talk"><span class="jx-ask-ic">${ic('<path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4 3v-3H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/><path d="M8 10h8M8 13h5"/>')}</span><span class="grow"><b>Ρώτα τον B1BLE</b><small>«Ποιες εκκρεμότητες έχω αυτή την εβδομάδα;»</small></span><span class="chev">${ICON.chev}</span></button>
   <div class="jx-stats">
     ${card("shop-filter", "active", ic('<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0M16 5.5a3 3 0 0 1 0 6M18 19a5 5 0 0 0-2.5-4.3"/>'), customers.length, "Πελάτες", newCustomers ? `<span class="up">+${newCustomers}</span> νέοι τις τελευταίες 7 μέρες` : `${plural(state.shops.length, "μαγαζί", "μαγαζιά")} συνολικά`)}
     ${card("go", "settings", ic('<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/><path d="M12 12l7-7M16 5h3v3"/>'), pct + "%", "Στόχος επισκέψεων", `${monthVisits} από ${target} αυτόν τον μήνα`, `<span class="jx-bar"><span style="width:${pct}%"></span></span>`)}
@@ -1461,7 +1488,9 @@ function renderChrome() {
   document.getElementById("hdr-eyebrow").textContent = eyebrow;
   document.getElementById("hdr-back").hidden = !back;
   document.getElementById("hdr-actions").innerHTML = actions;
-  document.querySelector("header.top").classList.toggle("home", state.view === "today" && !state.shopId && !state.catId);
+  const home = state.view === "today" && !state.shopId && !state.catId;
+  document.querySelector("header.top").classList.toggle("home", home);
+  document.body.classList.toggle("on-hub", home);
 }
 function safeRender() { if (state.editing || state.dirty || state.busy) { state.pending = true; return; } render(); }
 function settle() { state.dirty = false; state.pending = false; render(); }
@@ -1511,6 +1540,7 @@ async function onAction(ev) {
   }
   else if (a === "go") { ev.preventDefault(); nav(el.dataset.v); }
   else if (a === "talk") openTalk();
+  else if (a === "hub-scroll") { ev.preventDefault(); const el = document.getElementById("hub-day"); el && el.scrollIntoView({ behavior: "smooth" }); }
   else if (a === "car") openCar();
   else if (a === "copy-car-link") { const u = location.origin + location.pathname + "#car?q="; (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject()).then(() => toast("Αντιγράφηκε ✓"), () => toast(u)); }
   else if (a === "route-toggle") { const R = routeState(), id = el.dataset.id; R.ids = R.ids.includes(id) ? R.ids.filter((x) => x !== id) : [...R.ids, id]; saveRoute(); render(); }
