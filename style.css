@@ -827,3 +827,57 @@ body.car-on { overflow: hidden; }
 .car.has-p .car-orb .core svg { width: 40px; height: 40px; }
 .car.has-p .car-said { font-size: clamp(19px, 5.4vw, 24px); }
 .siri-steps { padding: 14px 16px; }
+
+/* ---------- home hub: the B1ble logo in the middle, sections around it; no bottom bar ---------- */
+nav.tabs { left: auto; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); width: auto; background: none !important; border: 0 !important; box-shadow: none !important; -webkit-backdrop-filter: none; backdrop-filter: none; padding: 0; }
+nav.tabs .wrap { display: block; padding: 0; width: auto; }
+nav.tabs a { display: none; }
+nav.tabs .nav-talk { padding: 0; font-size: 0; gap: 0; }
+nav.tabs .talk-circle { margin: 0; width: 60px; height: 60px; }
+body { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+body.on-hub nav.tabs, body.on-hub header.top { display: none; }
+body.on-hub { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
+body.on-hub #app { padding-top: 0; }
+.hub { position: relative; margin: 0 calc(-1 * max(16px, env(safe-area-inset-left, 0px))); padding: calc(18px + env(safe-area-inset-top, 0px)) max(18px, env(safe-area-inset-left, 0px)) 14px; min-height: 100svh; display: flex; flex-direction: column; color: #E8F2FB;
+  background: radial-gradient(70% 40% at 50% 48%, rgba(34, 211, 238, 0.2), transparent 70%), radial-gradient(90% 50% at 85% 0%, rgba(14, 116, 144, 0.35), transparent 70%), linear-gradient(170deg, #071A2E, #040B16 70%); }
+.hub-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.hub-date { font-size: 13px; color: #7FB4CF; text-transform: capitalize; }
+.hub-hi { font-size: 28px; line-height: 1.1; margin-top: 3px; color: #fff; }
+.hub-tr { display: flex; align-items: center; gap: 6px; flex: none; }
+.hub-tr .jx-weather small { display: none; }
+.hub-tr .icon-btn { color: #A5F3FC; }
+.hub-orbit { position: relative; flex: 1; min-height: 380px; max-height: 470px; margin: 8px 0 6px; }
+.hub-lines { position: absolute; inset: 0; width: 100%; height: 100%; }
+.hub-lines line { stroke: #67E8F9; stroke-opacity: 0.35; stroke-width: 1.5; stroke-dasharray: 4 6; vector-effect: non-scaling-stroke; }
+.hub-ring { position: absolute; left: 50%; top: 50%; border-radius: 50%; border: 1px dashed rgba(103, 232, 249, 0.35); transform: translate(-50%, -50%); pointer-events: none; }
+.hub-ring.r1 { width: 250px; height: 250px; }
+.hub-ring.r2 { width: 340px; height: 340px; border-style: solid; border-color: rgba(103, 232, 249, 0.12); }
+.hub-core { position: absolute; left: 50%; top: 50%; width: 172px; height: 172px; transform: translate(-50%, -50%); border-radius: 50%; overflow: hidden; padding: 0; border: 0; cursor: pointer; background: #04101E;
+  box-shadow: 0 0 0 2px rgba(103, 232, 249, 0.5), 0 0 60px rgba(34, 211, 238, 0.45), 0 0 140px rgba(34, 211, 238, 0.2); }
+.hub-core img { width: 100%; height: 100%; display: block; transform: scale(1.12); }
+.hub-core:active { transform: translate(-50%, -50%) scale(0.96); }
+@media (prefers-reduced-motion: no-preference) { .hub-core { animation: hub-breathe 3.2s ease-in-out infinite; } .hub-ring.r1 { animation: hub-spin 60s linear infinite; } }
+@keyframes hub-breathe { 50% { box-shadow: 0 0 0 2px rgba(103, 232, 249, 0.7), 0 0 80px rgba(34, 211, 238, 0.6), 0 0 160px rgba(34, 211, 238, 0.25); } }
+@keyframes hub-spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+.hub-tap { position: absolute; left: 50%; top: calc(50% - 124px); transform: translateX(-50%); font-size: 11.5px; color: #A5F3FC; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; pointer-events: none; }
+.hub-node { position: absolute; width: 110px; text-align: center; background: none; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer; display: flex; flex-direction: column; align-items: center; }
+.hub-node b { margin-top: 8px; font-family: var(--font-display); font-size: 16px; color: #fff; }
+.hub-node small { font-size: 11.5px; color: #7FB4CF; margin-top: 1px; line-height: 1.3; }
+.hub-bub { position: relative; width: 74px; height: 74px; border-radius: 24px; display: grid; place-items: center; background: linear-gradient(160deg, rgba(18, 52, 84, 0.95), rgba(7, 24, 44, 0.95)); border: 1px solid rgba(103, 232, 249, 0.4); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08); }
+.hub-bub svg { width: 32px; height: 32px; stroke: #67E8F9; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.hub-node:active .hub-bub { transform: scale(0.94); }
+.hub-badge { position: absolute; top: -7px; right: -7px; background: #F5C451; color: #2E2000; font-weight: 700; font-size: 12px; min-width: 22px; height: 22px; border-radius: 11px; display: grid; place-items: center; padding: 0 6px; box-shadow: 0 0 12px rgba(245, 196, 81, 0.6); }
+.hub-node.n1 { left: 0; top: 4%; } .hub-node.n2 { right: 0; top: 4%; } .hub-node.n3 { left: 50%; bottom: -2%; transform: translateX(-50%); }
+.hub-next { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; border-radius: 18px; padding: 13px 14px; margin-top: 14px; background: rgba(10, 30, 52, 0.8); border: 1px solid rgba(103, 232, 249, 0.2); color: inherit; font: inherit; cursor: pointer; }
+.hub-next b { display: block; font-size: 14.5px; color: #fff; } .hub-next small { font-size: 12.5px; color: #7FB4CF; }
+.hub-next .chev { color: #7FB4CF; }
+.hub-pin { width: 38px; height: 38px; border-radius: 12px; background: rgba(245, 196, 81, 0.15); display: grid; place-items: center; flex: none; }
+.hub-pin svg { width: 20px; height: 20px; stroke: #F5C451; fill: none; stroke-width: 2; }
+.hub-pills { display: flex; gap: 10px; margin-top: 10px; }
+.hub-pill { flex: 1; height: 50px; border-radius: 16px; display: flex; align-items: center; justify-content: center; gap: 8px; font: inherit; font-weight: 600; font-size: 14.5px; cursor: pointer; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); color: #E8F2FB; }
+.hub-pill.talk { background: linear-gradient(135deg, #22D3EE, #0891B2); color: #03202B; border: 0; box-shadow: 0 0 24px rgba(34, 211, 238, 0.4); }
+.hub-pill svg { width: 19px; height: 19px; stroke: currentColor; fill: none; stroke-width: 2; }
+.hub-more { display: block; text-align: center; margin-top: 12px; font-size: 13px; color: #7FB4CF; text-decoration: none; }
+.hub-hide { display: none; }
+#hub-day { scroll-margin-top: 12px; }
+@media (max-height: 700px) { .hub-orbit { min-height: 330px; } .hub-core { width: 140px; height: 140px; } .hub-ring.r1 { width: 210px; height: 210px; } .hub-ring.r2 { width: 290px; height: 290px; } .hub-tap { top: calc(50% - 106px); } }
