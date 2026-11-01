@@ -881,3 +881,7 @@ body.on-hub #app { padding-top: 0; }
 .hub-hide { display: none; }
 #hub-day { scroll-margin-top: 12px; }
 @media (max-height: 700px) { .hub-orbit { min-height: 330px; } .hub-core { width: 140px; height: 140px; } .hub-ring.r1 { width: 210px; height: 210px; } .hub-ring.r2 { width: 290px; height: 290px; } .hub-tap { top: calc(50% - 106px); } }
+
+/* open-book logo */
+.wl-book { width: 64px; height: 54px; object-fit: contain; }
+.hdr-book { width: 44px; height: 38px; object-fit: contain; display: block; margin-top: 1px; filter: drop-shadow(0 0 6px rgba(34, 211, 238, 0.5)); }
