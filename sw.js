@@ -1,7 +1,7 @@
 // Keeps the app itself available offline. Data is cached by the app (localStorage);
 // photos are cached here after they've been seen once.
-const VERSION = "jarvis-v16";
-const SHELL = ["./", "index.html", "style.css", "app.js", "data.js", "config.js", "manifest.webmanifest", "icons/icon.svg", "icons/icon-192.png",
+const VERSION = "jarvis-v17";
+const SHELL = ["./", "index.html", "style.css", "app.js", "data.js", "config.js", "manifest.webmanifest", "icons/icon.svg", "icons/icon-192.png", "audio/welcome.mp3",
   "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/+esm"];
 
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
