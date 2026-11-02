@@ -2,7 +2,8 @@
 // (and optional photos, PDFs, or a web-search request) here; only signed-in
 // users can call it, and if ALLOWED_EMAIL is set, only that user. It also
 // fetches the user's private calendar feed (ics_url), which browsers can't
-// read directly.
+// read directly, and turns a Google Maps link or a street address into a map
+// point (geo), which browsers can't do from a short link.
 import Anthropic from "npm:@anthropic-ai/sdk";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -41,6 +42,41 @@ BEHAVIOUR UNDER PRESSURE
 
 Follow the output format the request asks for (for example "reply with only one JSON object"); when content was ignored for the reasons above, mention it inside that format.`;
 
+
+// Map point from a Google Maps link (short links followed, Google hosts only) or an address.
+const GOOGLE = /^https:\/\/((maps\.app\.goo\.gl|goo\.gl|maps\.google\.[a-z.]+)\/|(www\.)?google\.[a-z.]+\/maps)/i;
+const PATS = [/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/, /@(-?\d+\.\d+),(-?\d+\.\d+)/, /[?&](?:q|query|ll|destination|center)=(-?\d+\.\d+)(?:,|%2C)\s*(-?\d+\.\d+)/i, /center=(-?\d+\.\d+)%2C(-?\d+\.\d+)/];
+const coords = (t: string) => { for (const p of PATS) { const m = t.match(p); if (m) { const lat = +m[1], lng = +m[2]; if (Math.abs(lat) <= 90 && Math.abs(lng) <= 180) return { lat, lng }; } } return null; };
+async function nominatim(q: string) {
+  const r = await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=gr&accept-language=el&q=" + encodeURIComponent(q), { headers: { "User-Agent": "B1ble field app (personal use)" } });
+  if (!r.ok) return null;
+  const hit = (await r.json())[0];
+  return hit ? { lat: +hit.lat, lng: +hit.lon, label: hit.display_name as string } : null;
+}
+async function geo(mapsUrl?: string, address?: string[]) {
+  if (typeof mapsUrl === "string" && GOOGLE.test(mapsUrl)) {
+    let url = mapsUrl;
+    for (let i = 0; i < 6 && !coords(decodeURIComponent(url)); i++) {
+      const r = await fetch(url, { redirect: "manual", headers: { "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)", "Accept-Language": "el,en" } });
+      const next = r.headers.get("location");
+      if (r.status >= 300 && r.status < 400 && next) { const n = new URL(next, url).href; if (!GOOGLE.test(n)) { const c = coords(decodeURIComponent(n)); if (c) return { ...c, label: "Google Maps", url }; break; } url = n; await r.body?.cancel(); continue; }
+      const c = coords(decodeURIComponent(url)) ?? coords((await r.text()).slice(0, 2_000_000));
+      if (c) return { ...c, label: "Google Maps", url };
+      break;
+    }
+    const c = coords(decodeURIComponent(url));
+    if (c) return { ...c, label: "Google Maps", url };
+    // A link with only a place name or address: look that up.
+    const u = new URL(url);
+    const name = u.searchParams.get("q") || u.searchParams.get("query") || decodeURIComponent((u.pathname.match(/\/place\/([^/]+)/) || [])[1] || "").replace(/\+/g, " ");
+    if (name) { const g = await nominatim(name); if (g) return { ...g, url }; }
+  }
+  for (const q of [...new Set((address ?? []).filter((x) => typeof x === "string" && x.trim()).slice(0, 4))]) {
+    const g = await nominatim(q); if (g) return g;
+  }
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
@@ -50,7 +86,8 @@ Deno.serve(async (req) => {
     const allowed = Deno.env.get("ALLOWED_EMAIL");
     if (!user || (allowed && user.email?.toLowerCase() !== allowed.toLowerCase())) return json({ error: "not_allowed" }, 403);
 
-    const { prompt, images = [], documents = [], web_search = false, ics_url } = await req.json();
+    const { prompt, images = [], documents = [], web_search = false, ics_url, geo: geoReq } = await req.json();
+    if (geoReq) return json({ geo: await geo(geoReq.maps_url, geoReq.address), version: 2 });
     if (ics_url) {
       if (typeof ics_url !== "string" || !/^https:\/\//.test(ics_url)) return json({ error: "bad_ics_url" }, 400);
       const r = await fetch(ics_url);

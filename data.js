@@ -237,7 +237,15 @@ export function makeSample() {
     if (!(data instanceof Blob) || !data.size) throw { code: "voice_error" };
     return data;
   }
+  /* A map point from a Google Maps link (short links too) or from addresses, found by the server. null if not found. */
+  async function geo(mapsUrl, address) {
+    if (!navigator.onLine) throw { code: "offline" };
+    const { data, error } = await sb.functions.invoke("jarvis-ai", { body: { geo: { maps_url: mapsUrl || undefined, address } } });
+    if (error || !data || data.version !== 2 || !("geo" in data)) throw { code: "server_old" };
+    return data.geo;
+  }
   const sample = (prompt, opts) => call(prompt, opts);
+  sample.geo = geo;
   sample.json = async (prompt, opts) => parseJson((await call(prompt, opts)).text);
   sample.ics = ics;
   sample.voice = voice;
