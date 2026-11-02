@@ -119,6 +119,25 @@ function parseLocation(text) {
   return null;
 }
 
+/* Address -> map point (OpenStreetMap search, free, no key). Tries the fullest address first, then simpler ones. */
+const geoCache = {};
+async function geocodeAddress(address, area, city) {
+  const a = String(address || "").trim(); if (!a) return null;
+  const c = String(city || "").trim() || "Athens", ar = String(area || "").trim();
+  const tries = [...new Set([[a, ar, c], [a, c], [a, ar], [a]].map((x) => x.filter(Boolean).join(", ")))];
+  for (const q of tries) {
+    if (q in geoCache) { if (geoCache[q]) return geoCache[q]; continue; }
+    try {
+      const res = await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=gr&accept-language=el&q=" + encodeURIComponent(q), { headers: { Accept: "application/json" } });
+      if (!res.ok) continue;
+      const hit = (await res.json())[0];
+      geoCache[q] = hit ? { lat: Number(hit.lat), lng: Number(hit.lon), label: hit.display_name || q } : null;
+      if (geoCache[q]) return geoCache[q];
+    } catch (e) { /* offline or blocked: try the next form */ }
+  }
+  return null;
+}
+
 /* brand knowledge from catalogues + recorded back bars */
 function brandIndex() {
   const idx = {};
@@ -1359,8 +1378,9 @@ function viewEdit(s) {
         ${f("area", "Περιοχή", "text", { list: "dl-areas", ph: "π.χ. Θησείο" })}
         ${f("city", "Πόλη", "text", { list: "dl-cities", value: s.city || "Athens" })}
       </div>
-      ${f("address", "Διεύθυνση")}
-      ${fld({ form: F, name: "location", label: "Τοποθεσία: επικόλλησε τον σύνδεσμο Google Maps ή συντεταγμένες", value: hasGeo(s) ? `${s.lat}, ${s.lng}` : (s.mapsLink || ""), ph: "37.97591, 23.72066 or https://www.google.com/maps/..." })}
+      ${f("address", "Διεύθυνση", "text", { ph: "π.χ. Αισχύλου 4" })}
+      <div class="row-actions"><button type="button" class="btn small" data-action="find-address">Βρες τη διεύθυνση στον χάρτη</button><span class="muted small" id="addr-note">Γράψε διεύθυνση και περιοχή. Μπαίνει μόνη της στον χάρτη όταν πατήσεις αποθήκευση.</span></div>
+      ${fld({ form: F, name: "location", label: "Τοποθεσία (γεμίζει μόνη της από τη διεύθυνση, ή επικόλλησε σύνδεσμο Google Maps)", value: hasGeo(s) ? `${s.lat}, ${s.lng}` : (s.mapsLink || ""), ph: "37.97591, 23.72066 or https://www.google.com/maps/..." })}
       <div class="row-actions"><button type="button" class="btn small" data-action="use-gps">Χρήση της τρέχουσας θέσης μου</button><span class="muted small" id="gps-note">Στάσου στην πόρτα του μαγαζιού για καλύτερη ακρίβεια.</span></div>
       <div class="grid2">${f("lastVisit", "Τελευταία επίσκεψη", "date")}${f("nextVisit", "Επόμενη επίσκεψη", "date")}</div>
     </div>
@@ -1599,6 +1619,14 @@ async function onAction(ev) {
   else if (a === "lightbox-one") { state.lightbox = { list: [{ id: el.dataset.pid }], index: 0 }; renderLightbox(); }
   else if (a === "near") { if (state.near) { state.near = false; render(); } else { el.textContent = "Σε εντοπίζω…"; locate().then(() => { state.near = true; render(); }).catch(() => { el.textContent = "📍 Η τοποθεσία είναι κλειδωμένη"; }); } }
   else if (a === "locate-me") { el.classList.add("busy"); locate().then(render).catch(() => { el.classList.remove("busy"); alert("Η τοποθεσία είναι κλειδωμένη. Επέτρεψέ την για την εφαρμογή στις ρυθμίσεις του κινητού."); }); }
+  else if (a === "find-address") {
+    const note = document.getElementById("addr-note"), val = (n) => (document.getElementById("f-shop-" + n) || {}).value || "";
+    if (!val("address").trim()) { note.textContent = "Γράψε πρώτα τη διεύθυνση."; return; }
+    note.textContent = "Ψάχνω τη διεύθυνση…";
+    const g = await geocodeAddress(val("address"), val("area"), val("city"));
+    if (g) { document.getElementById("f-shop-location").value = `${g.lat.toFixed(6)}, ${g.lng.toFixed(6)}`; note.textContent = `Βρέθηκε: ${g.label}`; state.dirty = true; }
+    else note.textContent = "Δεν τη βρήκα. Δοκίμασε με την περιοχή ή επικόλλησε τον σύνδεσμο από το Google Maps.";
+  }
   else if (a === "use-gps") { const note = document.getElementById("gps-note"); note.textContent = "Σε εντοπίζω…"; locate().then((h) => { document.getElementById("f-shop-location").value = `${h.lat.toFixed(6)}, ${h.lng.toFixed(6)}`; note.textContent = `Βρέθηκε, με ακρίβεια περίπου ${Math.round(h.acc)} μ.`; state.dirty = true; }).catch(() => { note.textContent = "Δεν βρέθηκε η θέση σου. Επέτρεψε την τοποθεσία για την εφαρμογή στις ρυθμίσεις του κινητού."; }); }
   else if (a === "settings") nav("settings");
   else if (a === "sign-out") { await sb.auth.signOut(); location.reload(); }
@@ -1673,11 +1701,21 @@ app.addEventListener("submit", async (ev) => {
     ["name", "type", "status", "owner", "area", "city", "address", "lastVisit", "nextVisit", "pricingNotes", "investNotes", "insideInfo"].forEach((k) => data[k] = v(k));
     const amt = v("investAmount"); data.investAmount = amt === "" ? "" : Number(amt);
     data.scores = {}; CRITERIA.forEach(([k]) => { const x = v("sc_" + k); data.scores[k] = x === "" ? 0 : Math.max(0, Math.min(5, Math.round(Number(x)))); });
-    const loc = v("location"); const geo = parseLocation(loc);
-    if (geo) { data.lat = geo.lat; data.lng = geo.lng; data.mapsLink = loc.startsWith("http") ? loc : ""; } else { data.mapsLink = loc; }
-    data.updatedAt = stamp;
     const isNew = state.shopId === "new";
     const old = isNew ? null : shopById(state.shopId);
+    let loc = v("location"); let geo = parseLocation(loc);
+    // Plain text typed in the location box (not a link or coordinates) is an address.
+    if (!geo && loc && !/^https?:/i.test(loc)) { if (!data.address) data.address = loc; loc = ""; }
+    // The location box still shows the old point but the address changed: the address wins.
+    const oldPoint = old && hasGeo(old) ? `${old.lat}, ${old.lng}` : "";
+    const addrChanged = !old || [old.address, old.area, old.city].map((x) => String(x || "").trim()).join("|") !== [data.address, data.area, data.city].join("|");
+    if (data.address && (!geo || (addrChanged && loc === oldPoint))) {
+      if (btn) btn.textContent = "Ψάχνω τη διεύθυνση…";
+      const g = await geocodeAddress(data.address, data.area, data.city);
+      if (g) { geo = g; if (!/^https?:/i.test(loc)) loc = ""; } else if (addrChanged) toast("Αποθηκεύτηκε, αλλά δεν βρήκα τη διεύθυνση στον χάρτη. Επικόλλησε τον σύνδεσμο του Google Maps.");
+    }
+    if (geo) { data.lat = geo.lat; data.lng = geo.lng; data.mapsLink = loc.startsWith("http") ? loc : ""; } else { data.mapsLink = loc; }
+    data.updatedAt = stamp;
     if (isNew) data.statusHistory = [statusEntry("", data.status)];
     else if (old && old.status !== data.status) data.statusHistory = [...(old.statusHistory || []), statusEntry(old.status, data.status, v("statusReason"))];
     await guarded(async () => {
@@ -2086,10 +2124,13 @@ async function talkSend() {
 /* Saves one update (from Talk or from a work file): shop fields, items, visit, tasks. Returns the shop id. */
 async function applyUpdate(r, stamp) {
   let id = r.shopId;
-  if (!id && r.newShop) { const ref = state.db.collection("shops").doc(); id = ref.id; await ref.set({ name: r.newShop.name || "Νέο μαγαζί", type: r.newShop.type || "Other", status: r.newShop.status || "prospect", area: r.newShop.area || "", city: r.newShop.city || "Athens", address: r.newShop.address || "", ...(!r.source && state.here && Date.now() - state.here.at < 10 * 60000 ? { lat: state.here.lat, lng: state.here.lng } : {}), createdAt: stamp, updatedAt: stamp, statusHistory: [statusEntry("", r.newShop.status || "prospect")], photos: [], contacts: [], assets: [], posm: [], backbar: [], products: [], consumption: [], scores: {} }); }
+  const newAddr = r.newShop && r.newShop.address || (r.fields || {}).address;
+  const g = newAddr ? await geocodeAddress(newAddr, (r.fields || {}).area || r.newShop && r.newShop.area || (shopById(r.shopId) || {}).area, r.newShop && r.newShop.city || (shopById(r.shopId) || {}).city) : null;
+  if (!id && r.newShop) { const ref = state.db.collection("shops").doc(); id = ref.id; await ref.set({ name: r.newShop.name || "Νέο μαγαζί", type: r.newShop.type || "Other", status: r.newShop.status || "prospect", area: r.newShop.area || "", city: r.newShop.city || "Athens", address: r.newShop.address || "", ...(!r.source && state.here && Date.now() - state.here.at < 10 * 60000 ? { lat: state.here.lat, lng: state.here.lng } : {}), ...(g ? { lat: g.lat, lng: g.lng } : {}), createdAt: stamp, updatedAt: stamp, statusHistory: [statusEntry("", r.newShop.status || "prospect")], photos: [], contacts: [], assets: [], posm: [], backbar: [], products: [], consumption: [], scores: {} }); }
   const s = shopById(id) || {};
   const f = r.fields || {}; const patch = { updatedAt: stamp };
   ["owner", "address", "area", "status", "nextVisit"].forEach((k) => { if (f[k]) patch[k] = f[k]; });
+  if (g && f.address && f.address !== s.address) { patch.lat = g.lat; patch.lng = g.lng; }
   if (!r.newShop && f.status && f.status !== s.status) patch.statusHistory = [...(s.statusHistory || []), statusEntry(s.status, f.status, f.statusReason || "")];
   if (f.investAmount) patch.investAmount = Number(f.investAmount);
   if (f.insideInfoAdd) patch.insideInfo = [s.insideInfo, `${todayISO()}: ${f.insideInfoAdd}`].filter(Boolean).join("\n");
