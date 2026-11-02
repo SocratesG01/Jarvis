@@ -59,7 +59,7 @@ async function geo(mapsUrl?: string, address?: string[]) {
     for (let i = 0; i < 6 && !coords(decodeURIComponent(url)); i++) {
       const r = await fetch(url, { redirect: "manual", headers: { "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)", "Accept-Language": "el,en" } });
       const next = r.headers.get("location");
-      if (r.status >= 300 && r.status < 400 && next) { const n = new URL(next, url).href; if (!GOOGLE.test(n)) break; url = n; await r.body?.cancel(); continue; }
+      if (r.status >= 300 && r.status < 400 && next) { const n = new URL(next, url).href; if (!GOOGLE.test(n)) { const c = coords(decodeURIComponent(n)); if (c) return { ...c, label: "Google Maps", url }; break; } url = n; await r.body?.cancel(); continue; }
       const c = coords(decodeURIComponent(url)) ?? coords((await r.text()).slice(0, 2_000_000));
       if (c) return { ...c, label: "Google Maps", url };
       break;
