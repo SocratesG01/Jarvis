@@ -144,12 +144,20 @@ function brandIndex() {
   state.catalogues.forEach((c) => (c.items || []).forEach((it) => { if (it.brand) idx[it.brand.toLowerCase()] = { company: c.company, category: it.category || "" }; }));
   return idx;
 }
+/* wholesalers: up to 2 per shop; the same names are offered again on every shop */
+const MAX_WHOLESALERS = 2;
+function knownWholesalers() {
+  const m = new Map();
+  state.shops.forEach((s) => (s.wholesalers || []).forEach((w) => { const n = String(w.name || "").trim(); if (!n) return; const k = [...m.keys()].find((x) => loose(x) === loose(n)) || n; const prev = m.get(k) || { name: k, phone: "", code: "", shops: 0 }; m.set(k, { ...prev, phone: prev.phone || w.phone || "", code: prev.code || w.code || "", shops: prev.shops + 1 }); }));
+  return m;
+}
+function wholesalerKnown(name) { const n = loose(String(name || "").trim()); return [...knownWholesalers().values()].find((w) => loose(w.name) === n) || null; }
 function datalists() {
-  const brands = new Set(), companies = new Set(), areas = new Set(AREAS), cities = new Set(["Athens"]), products = new Set();
+  const brands = new Set(), companies = new Set(), areas = new Set(AREAS), cities = new Set(["Athens"]), products = new Set(), wholesalers = new Set(knownWholesalers().keys());
   state.catalogues.forEach((c) => { if (c.company) companies.add(c.company); (c.items || []).forEach((it) => it.brand && brands.add(it.brand)); });
   state.shops.forEach((s) => { if (s.area) areas.add(s.area); if (s.city) cities.add(s.city); (s.backbar || []).forEach((b) => { b.brand && brands.add(b.brand); b.company && companies.add(b.company); }); (s.consumption || []).forEach((c) => c.product && products.add(c.product)); (s.products || []).forEach((p) => p.name && products.add(p.name)); });
   const dl = (id, set) => `<datalist id="${id}">${[...set].sort().map((v) => `<option value="${esc(v)}"></option>`).join("")}</datalist>`;
-  return `<datalist id="dl-cats">${CATEGORIES.map((v) => `<option value="${esc(v)}" label="${esc(tr(v))}"></option>`).join("")}</datalist>` + dl("dl-brands", brands) + dl("dl-companies", companies) + dl("dl-areas", areas) + dl("dl-cities", cities) + dl("dl-products", products);
+  return `<datalist id="dl-cats">${CATEGORIES.map((v) => `<option value="${esc(v)}" label="${esc(tr(v))}"></option>`).join("")}</datalist>` + dl("dl-brands", brands) + dl("dl-companies", companies) + dl("dl-areas", areas) + dl("dl-cities", cities) + dl("dl-products", products) + dl("dl-wholesalers", wholesalers);
 }
 
 
@@ -182,6 +190,7 @@ const CAR_ICON = ic('<path d="M5 16l1.5-5.2A2 2 0 0 1 8.4 9.3h7.2a2 2 0 0 1 1.9 
 const ICON = {
   mic: ic('<path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/><path d="M18 11a6 6 0 0 1-12 0M12 17v4"/>'),
   plus: ic('<path d="M12 5v14M5 12h14"/>'),
+  truck: ic('<path d="M2 6h11v10H2zM13 9h4l4 4v3h-8z"/><circle cx="6" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/>'),
   map: ic('<path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/>'),
   locate: ic('<circle cx="12" cy="12" r="3.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7.5"/>'),
   edit: ic('<path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/>'),
@@ -829,6 +838,7 @@ Match rows to known shops by name (allow Greek/Latin spellings and small differe
    "newShop": {"name":"","type":"${TYPES.join("|")}","area":"","city":"Athens","address":"","status":"active|az|competitor|prospect"} or null (only for shops not in the list, and only if the file is a customer/prospect list),
    "fields": {"owner":"","address":"","area":"","status":"","nextVisit":"YYYY-MM-DD","investAmount":0,"insideInfoAdd":"","pricingNotesAdd":""},
    "contacts": [{"name":"","role":"","phone":"","email":"","notes":""}],
+   "wholesalers": [{"name":"wholesaler / distributor the shop buys from","phone":"","notes":""}] (at most 2 per shop),
    "products": [{"name":"","price":"our price/terms","menuPrice":"their menu price","notes":""}],
    "consumption": [{"month":"YYYY-MM","product":"","qty":0,"unit":""}],
    "assets": [{"type":"${ASSET_TYPES.join("|")}","brand":"","serial":"","qty":"1","notes":""}],
@@ -1049,7 +1059,7 @@ function viewShops() {
   const byStatus = state.shops.filter((s) => state.shopFilter === "all" || s.status === state.shopFilter);
   const areaCounts = {}; byStatus.forEach((s) => { const a = areaOf(s); areaCounts[a] = (areaCounts[a] || 0) + 1; });
   let list = byStatus.filter((s) => state.areaFilter === "all" || areaOf(s) === state.areaFilter);
-  if (q) { const nq = loose(q); list = list.filter((s) => loose([s.name, s.area, s.city, s.owner, s.type, tr(s.type), s.address, s.insideInfo, ...(s.contacts || []).flatMap((c) => [c.name, c.role, c.phone, c.email]), ...(s.products || []).map((p) => p.name), ...(s.backbar || []).map((b) => b.brand)].join(" ")).includes(nq) || norm(String(q).replace(/\s/g, "")).length > 3 && (s.contacts || []).some((c) => String(c.phone || "").replace(/\s/g, "").includes(String(q).replace(/\s/g, "")))); }
+  if (q) { const nq = loose(q); list = list.filter((s) => loose([s.name, s.area, s.city, s.owner, s.type, tr(s.type), s.address, s.insideInfo, ...(s.contacts || []).flatMap((c) => [c.name, c.role, c.phone, c.email]), ...(s.wholesalers || []).flatMap((w) => [w.name, w.code]), ...(s.products || []).map((p) => p.name), ...(s.backbar || []).map((b) => b.brand)].join(" ")).includes(nq) || norm(String(q).replace(/\s/g, "")).length > 3 && (s.contacts || []).some((c) => String(c.phone || "").replace(/\s/g, "").includes(String(q).replace(/\s/g, "")))); }
   const prospectMode = state.shopFilter === "prospect";
   const groups = {};
   list.forEach((s) => (groups[areaOf(s)] = groups[areaOf(s)] || []).push(s));
@@ -1229,6 +1239,7 @@ function profileCard(s) {
     ${cell("Τελευταία επίσκεψη", lv ? `<b>${fmtDate(lv.date)} <span class="muted small">(πριν ${daysBetween(lv.date, todayISO())} μέρες)</span></b><small>${esc(clip(lv.notes, 120))}</small>` : s.lastVisit ? `<b>${fmtDate(s.lastVisit)}</b>` : none("Καμία ακόμα"))}
     ${cell("Τελευταία παραγγελία", lo ? `<b>${fmtDate(lo.date)}</b><small>${esc(clip(orderText(lo), 120))}</small>` : none("Καμία", "Καταγράφεται με «Επίσκεψη» ή από τον B1ble"))}
     ${cell("Επαφή", c ? `<b>${esc(c.name || "Χωρίς όνομα")}${c.role ? ` <span class="muted small">${esc(c.role)}</span>` : ""}</b><small>${c.phone ? `<a href="${esc(telHref(c.phone))}" class="num">${esc(c.phone)}</a>` : ""}${c.phone && c.email ? " · " : ""}${c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : ""}</small>` : `<b class="muted">Καμία</b><small><button class="link small" data-action="shop-tab" data-v="contacts">Πρόσθεσε επαφή</button></small>`)}
+    ${cell("Χονδρέμποροι", (s.wholesalers || []).length ? `<b>${s.wholesalers.map((w) => esc(w.name)).join(" · ")}</b><small>${s.wholesalers.filter((w) => w.phone).map((w) => `<a href="${esc(telHref(w.phone))}" class="num">${esc(w.phone)}</a>`).join(" · ")}</small>` : `<b class="muted">Κανένας</b><small><button class="link small" data-action="shop-tab" data-v="contacts">Πρόσθεσε χονδρέμπορο</button></small>`)}
     ${cell("Τοποθεσία", addr || hasGeo(s) ? `<b>${esc(addr || "Σημείο GPS")}</b><small><a href="${mapsSearch(s)}" target="_blank" rel="noopener">Άνοιγμα στον χάρτη</a></small>` : none("Χωρίς διεύθυνση", "Πρόσθεσέ τη από την επεξεργασία"))}
   </div></section>`;
 }
@@ -1325,10 +1336,16 @@ function tabConsumption(s) {
   ${adder(`cons:${s.id}`, "Νέο μηνιαίο νούμερο", [{ name: "month", label: "Μήνας", type: "month", required: true, value: todayISO().slice(0, 7) }, { name: "product", label: "Προϊόν", required: true, list: "dl-products", value: cur || "" }, { name: "qty", label: "Ποσότητα", type: "number", required: true, attrs: 'min="0" step="any" inputmode="decimal"' }, { name: "unit", label: "Μονάδα", value: unit || "", ph: "βαρέλια, κιβώτια, φιάλες" }], "Προσθήκη")}`;
 }
 
+function tabWholesalers(s) {
+  const ws = s.wholesalers || [];
+  return `<section class="section"><div class="section-head"><h2>Χονδρέμποροι</h2><span class="muted small">από πού παίρνει (έως ${MAX_WHOLESALERS})</span></div>
+  <div class="panel">${ws.length ? `<ul class="list">${ws.map((w, i) => { const k = wholesalerKnown(w.name); return `<li class="item"><span class="ph" aria-hidden="true">${ICON.truck}</span><div class="grow"><div class="title">${esc(w.name)}${i === 0 && ws.length > 1 ? ` <span class="muted small">κύριος</span>` : ""}</div><div class="sub">${[w.phone && `<a href="${esc(telHref(w.phone))}" class="num">${esc(w.phone)}</a>`, w.code && `Κωδ. <span class="num">${esc(w.code)}</span>`, k && k.shops > 1 && `${k.shops} μαγαζιά σου`].filter(Boolean).join(" · ")}${w.notes ? `<div>${esc(w.notes)}</div>` : ""}</div></div>${rmButton(`shop:${s.id}:wholesalers:${i}`)}</li>`; }).join("")}</ul>` : `<div class="empty">Δεν έχει οριστεί χονδρέμπορος ακόμα.</div>`}</div>
+  ${ws.length < MAX_WHOLESALERS ? adder(`wholesaler:${s.id}`, ws.length ? "Δεύτερος χονδρέμπορος" : "Νέος χονδρέμπορος", [{ name: "name", label: "Χονδρέμπορος", required: true, list: "dl-wholesalers", ph: "Διάλεξε ή γράψε όνομα" }, { name: "phone", label: "Τηλέφωνο", type: "tel", ph: "Συμπληρώνεται μόνο του αν τον έχεις ήδη" }, { name: "notes", label: "Σημειώσεις", ph: "Τι παίρνει από εκεί, πωλητής, μέρα παράδοσης" }], "Αποθήκευση") : ""}</section>`;
+}
 function tabContacts(s) {
   const cs = s.contacts || [];
-  return `<div class="panel">${cs.length ? `<ul class="list">${cs.map((c, i) => `<li class="item"><span class="ph" aria-hidden="true">${esc((c.name || "?").charAt(0).toUpperCase())}</span><div class="grow"><div class="title">${esc(c.name)}${c.role ? ` <span class="muted small">${esc(c.role)}</span>` : ""}</div><div class="sub">${c.phone ? `<a href="${esc(telHref(c.phone))}" class="num">${esc(c.phone)}</a>` : ""}${c.phone && c.email ? " · " : ""}${c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : ""}${c.notes ? `<div>${esc(c.notes)}</div>` : ""}</div></div>${rmButton(`shop:${s.id}:contacts:${i}`)}</li>`).join("")}</ul>` : `<div class="empty">Δεν υπάρχουν επαφές ακόμα.</div>`}</div>
-  ${adder(`contact:${s.id}`, "Νέα επαφή", [{ name: "name", label: "Όνομα", required: true }, { name: "role", label: "Ρόλος", ph: "Ιδιοκτήτης, υπεύθυνος, bartender" }, { name: "phone", label: "Τηλέφωνο", type: "tel" }, { name: "email", label: "Email", type: "email" }, { name: "notes", label: "Σημειώσεις", ph: "Καλύτερη ώρα για τηλέφωνο, γενέθλια, προτιμήσεις" }], "Αποθήκευση")}`;
+  return `${tabWholesalers(s)}<section class="section"><div class="section-head"><h2>Επαφές</h2></div><div class="panel">${cs.length ? `<ul class="list">${cs.map((c, i) => `<li class="item"><span class="ph" aria-hidden="true">${esc((c.name || "?").charAt(0).toUpperCase())}</span><div class="grow"><div class="title">${esc(c.name)}${c.role ? ` <span class="muted small">${esc(c.role)}</span>` : ""}</div><div class="sub">${c.phone ? `<a href="${esc(telHref(c.phone))}" class="num">${esc(c.phone)}</a>` : ""}${c.phone && c.email ? " · " : ""}${c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : ""}${c.notes ? `<div>${esc(c.notes)}</div>` : ""}</div></div>${rmButton(`shop:${s.id}:contacts:${i}`)}</li>`).join("")}</ul>` : `<div class="empty">Δεν υπάρχουν επαφές ακόμα.</div>`}</div>
+  ${adder(`contact:${s.id}`, "Νέα επαφή", [{ name: "name", label: "Όνομα", required: true }, { name: "role", label: "Ρόλος", ph: "Ιδιοκτήτης, υπεύθυνος, bartender" }, { name: "phone", label: "Τηλέφωνο", type: "tel" }, { name: "email", label: "Email", type: "email" }, { name: "notes", label: "Σημειώσεις", ph: "Καλύτερη ώρα για τηλέφωνο, γενέθλια, προτιμήσεις" }], "Αποθήκευση")}</section>`;
 }
 
 const visitItem = (v) => `<li class="item"><div class="grow"><div class="sub num">${fmtDate(v.date)}${v.outcome ? ` · <span class="outcome ${esc(v.outcome)}">${esc(lbl(OUTCOMES, v.outcome))}</span>` : ""}${v.potential ? ` · Δυναμική: ${esc(lbl(POTENTIAL, v.potential))}` : ""}</div><div style="white-space:pre-wrap">${esc(v.notes)}</div>${(v.discussed || []).length ? `<div class="sub">Συζητήσαμε: ${esc(v.discussed.join(", "))}</div>` : ""}${(v.order || []).length ? `<div class="sub">Παραγγελία: ${esc(orderText({ items: v.order }))}</div>` : ""}${v.competition ? `<div class="sub">Ανταγωνισμός: ${esc(v.competition)}</div>` : ""}</div></li>`;
@@ -1747,6 +1764,12 @@ app.addEventListener("submit", async (ev) => {
     await pushTo("shops", id, "consumption", { month: v("month"), product: v("product"), qty: Number(v("qty")) || 0, unit: v("unit") });
   } else if (kind === "contact") {
     await pushTo("shops", id, "contacts", { name: v("name"), role: v("role"), phone: v("phone"), email: v("email"), notes: v("notes") });
+  } else if (kind === "wholesaler") {
+    const s = shopById(id), ws = s.wholesalers || [], k = wholesalerKnown(v("name"));
+    const name = k ? k.name : v("name").trim();
+    if (ws.length >= MAX_WHOLESALERS) toast(`Μέχρι ${MAX_WHOLESALERS} χονδρέμποροι ανά μαγαζί.`);
+    else if (ws.some((w) => loose(w.name) === loose(name))) toast("Αυτός ο χονδρέμπορος υπάρχει ήδη εδώ.");
+    else await pushTo("shops", id, "wholesalers", { name, ...(k && k.code ? { code: k.code } : {}), phone: v("phone") || (k && k.phone) || "", notes: v("notes") });
   } else if (kind === "catalogue") {
     const ref = state.db.collection("catalogues").doc();
     if (await guarded(() => ref.set({ company: v("company"), items: [], photos: [], createdAt: stamp }))) { state.dirty = false; openCat(ref.id); return; }
@@ -1954,7 +1977,7 @@ function digest(full, curId = null, only = null) {
     if (hasGeo(s)) { d.lat = +s.lat.toFixed(5); d.lng = +s.lng.toFixed(5); }
     if (full) {
       const mine = s.id === curId;
-      Object.assign(d, { owner: s.owner || "", address: s.address || "", lastVisit: s.lastVisit || "", nextVisit: s.nextVisit || "", investAmount: s.investAmount || "", score: scoreOf(s), contacts: (s.contacts || []).map((c) => [c.name, c.role && `(${c.role})`, c.phone, c.email].filter(Boolean).join(" ")), assets: (s.assets || []).map((a) => `${a.type} ${a.brand || ""} S/N ${a.serial || "-"} x${a.qty || 1}${a.notes ? " " + a.notes : ""}`), posm: (s.posm || []).map((p) => `${p.type} ${p.brand || ""} x${p.qty || 1}${p.notes ? " " + p.notes : ""}`), backbar: (s.backbar || []).map((b) => `${b.brand} (${b.company || "?"}) x${b.facings || 1}`), products: (s.products || []).map((p) => `${p.name} ${p.price || ""}`), consumption: (s.consumption || []).slice(-24).map((c) => `${c.month} ${c.product} ${c.qty} ${c.unit || ""}`), insideInfo: clip(s.insideInfo, mine ? 2000 : 500), pricingNotes: clip(s.pricingNotes, 300),
+      Object.assign(d, { owner: s.owner || "", address: s.address || "", lastVisit: s.lastVisit || "", nextVisit: s.nextVisit || "", investAmount: s.investAmount || "", score: scoreOf(s), contacts: (s.contacts || []).map((c) => [c.name, c.role && `(${c.role})`, c.phone, c.email].filter(Boolean).join(" ")), wholesalers: (s.wholesalers || []).map((w) => [w.name, w.phone].filter(Boolean).join(" ")), assets: (s.assets || []).map((a) => `${a.type} ${a.brand || ""} S/N ${a.serial || "-"} x${a.qty || 1}${a.notes ? " " + a.notes : ""}`), posm: (s.posm || []).map((p) => `${p.type} ${p.brand || ""} x${p.qty || 1}${p.notes ? " " + p.notes : ""}`), backbar: (s.backbar || []).map((b) => `${b.brand} (${b.company || "?"}) x${b.facings || 1}`), products: (s.products || []).map((p) => `${p.name} ${p.price || ""}`), consumption: (s.consumption || []).slice(-24).map((c) => `${c.month} ${c.product} ${c.qty} ${c.unit || ""}`), insideInfo: clip(s.insideInfo, mine ? 2000 : 500), pricingNotes: clip(s.pricingNotes, 300),
         visits: visitsOf(s.id).slice(0, mine ? 12 : 3).map((v) => ({ id: "v:" + v.id, date: v.date, notes: clip(v.notes, mine ? 900 : 260), outcome: v.outcome || undefined, competition: v.competition || undefined })),
         orders: (s.orders || []).map((o, i) => ({ id: `o:${s.id}:${i}`, date: o.date, items: orderText(o) })).slice(-6),
         missing: oppsFor(s, dist, posm).map((o) => o.text) });
@@ -2007,6 +2030,7 @@ Reply with only one JSON object of this shape (omit empty fields):
  "visit": {"date":"YYYY-MM-DD","notes":"clean, complete summary of the visit in the rep's words","outcome":"positive|neutral|negative|absent","discussed":["products talked about"],"potential":"none|low|medium|high","competition":"what the competition is doing there"},
  "order": {"date":"YYYY-MM-DD","items":[{"product":"","qty":0,"unit":""}]} (only what the shop ordered now; do not also put it in consumption),
  "contacts": [{"name":"","role":"","phone":"","email":"","notes":""}],
+ "wholesalers": [{"name":"wholesaler / distributor the shop buys from","phone":"","notes":""}] (at most 2 per shop),
  "assets": [{"type":"${ASSET_TYPES.join("|")}","brand":"","serial":"","qty":"1","notes":""}],
  "posm": [{"type":"${POSM_TYPES.join("|")}","brand":"","qty":"1","notes":""}],
  "backbar": [{"brand":"","company":"","category":"${CATEGORIES.join("|")}","facings":1}],
@@ -2032,6 +2056,7 @@ function changeLines(r) {
   if (r.visit && r.visit.notes) L.push(["Επίσκεψη " + fmtDate(r.visit.date || todayISO()), [r.visit.notes, r.visit.outcome && "Αποτέλεσμα: " + lbl(OUTCOMES, r.visit.outcome), (r.visit.discussed || []).length && "Συζητήσαμε: " + r.visit.discussed.join(", "), r.visit.potential && "Δυναμική: " + lbl(POTENTIAL, r.visit.potential), r.visit.competition && "Ανταγωνισμός: " + r.visit.competition].filter(Boolean).join("\n")]);
   if (r.order && (r.order.items || []).length) L.push(["Παραγγελία " + fmtDate(r.order.date || (r.visit && r.visit.date) || todayISO()), orderText(r.order)]);
   (r.contacts || []).forEach((c) => L.push(["Επαφή", [c.name, c.role, c.phone, c.email].filter(Boolean).join(", ")]));
+  (r.wholesalers || []).forEach((w) => L.push(["Χονδρέμπορος", [w.name, w.phone, w.notes].filter(Boolean).join(", ")]));
   (r.assets || []).forEach((a) => L.push(["Εξοπλισμός", [tr(a.type), a.brand, a.serial && "S/N " + a.serial, a.qty > 1 && "×" + a.qty].filter(Boolean).join(", ")]));
   (r.posm || []).forEach((p) => L.push(["POSM", [tr(p.type), p.brand, p.qty > 1 && "×" + p.qty, p.notes].filter(Boolean).join(", ")]));
   (r.backbar || []).forEach((b) => L.push(["Back bar", `${b.brand}${b.company ? " (" + b.company + ")" : ""}${b.facings > 1 ? " ×" + b.facings : ""}`]));
@@ -2138,7 +2163,8 @@ async function applyUpdate(r, stamp) {
   if (f.scores && Object.keys(f.scores).length) patch.scores = { ...(s.scores || {}), ...f.scores };
   const known = brandIndex();
   const add = (field, items, map = (x) => x) => { if (items && items.length) patch[field] = [...(s[field] || []), ...items.map(map)]; };
-  add("contacts", r.contacts); add("assets", r.assets); add("posm", r.posm); add("products", r.products); add("consumption", r.consumption, (c) => ({ ...c, qty: Number(c.qty) || 0 }));
+  add("contacts", r.contacts); add("assets", r.assets);
+  if ((r.wholesalers || []).length) { const ws = [...(s.wholesalers || [])]; r.wholesalers.forEach((w) => { const k = wholesalerKnown(w.name), name = k ? k.name : String(w.name || "").trim(); if (name && ws.length < MAX_WHOLESALERS && !ws.some((x) => loose(x.name) === loose(name))) ws.push({ name, ...(k && k.code ? { code: k.code } : {}), phone: w.phone || (k && k.phone) || "", notes: w.notes || "" }); }); patch.wholesalers = ws; } add("posm", r.posm); add("products", r.products); add("consumption", r.consumption, (c) => ({ ...c, qty: Number(c.qty) || 0 }));
   add("backbar", r.backbar, (b) => ({ brand: b.brand, company: b.company || (known[(b.brand || "").toLowerCase()] || {}).company || "", category: b.category || (known[(b.brand || "").toLowerCase()] || {}).category || "", facings: Number(b.facings) || 1 }));
   if (r.backbar && r.backbar.length) patch.backbarDate = todayISO();
   if (r.visit && r.visit.notes) {

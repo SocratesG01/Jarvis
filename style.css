@@ -902,3 +902,4 @@ body.on-hub #app { padding-top: 0; }
 @keyframes wl-logo-in { from { opacity: 0; transform: translate(-50%, -50%) scale(0.92); filter: drop-shadow(0 0 0 rgba(30, 136, 255, 0)); } }
 @keyframes wl-logo-glow { 50% { filter: drop-shadow(0 0 38px rgba(30, 160, 255, 0.75)); } }
 .welcome.wl-art .wl-mid, .welcome.wl-art .wl-actions { position: relative; z-index: 1; }
+.ph svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
