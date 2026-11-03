@@ -121,6 +121,8 @@ function parseLocation(text) {
 
 /* Address -> map point (OpenStreetMap search, free, no key). Tries the fullest address first, then simpler ones. */
 const geoCache = {};
+let geoLast = 0;
+const geoWait = async () => { const w = geoLast + 1100 - Date.now(); if (w > 0) await new Promise((r) => setTimeout(r, w)); geoLast = Date.now(); }; // OpenStreetMap asks for at most one search a second
 async function geocodeAddress(address, area, city) {
   const a = String(address || "").trim(); if (!a) return null;
   const c = String(city || "").trim() || "Athens", ar = String(area || "").trim();
@@ -128,6 +130,7 @@ async function geocodeAddress(address, area, city) {
   for (const q of tries) {
     if (q in geoCache) { if (geoCache[q]) return geoCache[q]; continue; }
     try {
+      await geoWait();
       const res = await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=gr&accept-language=el&q=" + encodeURIComponent(q), { headers: { Accept: "application/json" } });
       if (!res.ok) continue;
       const hit = (await res.json())[0];
@@ -136,6 +139,33 @@ async function geocodeAddress(address, area, city) {
     } catch (e) { /* offline or blocked: try the next form */ }
   }
   return null;
+}
+
+/* Shops that came in from a list with an address but no pin: find them on the map in the background,
+   one search a second, and remember misses so the same address isn't searched again. */
+const GEO_CENTERS = { athens: { lat: 37.9755, lng: 23.7348 }, "αθηνα": { lat: 37.9755, lng: 23.7348 }, "σιφνος": { lat: 36.975, lng: 24.705 } };
+const plain = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+let autoLocating = false;
+async function autoLocateShops() {
+  if (autoLocating || !navigator.onLine) return;
+  const todo = state.shops.filter((s) => s.address && !(s.lat && s.lng) && s.geoMiss !== s.address);
+  if (!todo.length) return;
+  autoLocating = true;
+  let found = 0;
+  if (todo.length > 3) toast(`Βάζω ${todo.length} μαγαζιά στον χάρτη…`);
+  try {
+    for (const t of todo) {
+      if (!navigator.onLine) break;
+      const s = shopById(t.id); if (!s || (s.lat && s.lng) || s.address !== t.address) continue;
+      const g = await geocodeAddress(s.address, s.area, s.city);
+      const center = GEO_CENTERS[plain(s.city)];
+      const ok = g && (!center || distKm(center, g) <= 15);
+      await state.db.doc("shops/" + s.id).update(ok ? { lat: g.lat, lng: g.lng, geoAuto: true, geoMiss: "" } : { geoMiss: s.address });
+      if (ok) found++;
+    }
+  } catch (e) { /* offline or blocked: try again next time the app opens */ }
+  autoLocating = false;
+  if (todo.length > 3) toast(`Μπήκαν στον χάρτη ${found} από ${todo.length} μαγαζιά`);
 }
 
 /* brand knowledge from catalogues + recorded back bars */
@@ -2533,6 +2563,7 @@ async function startApp(session) {
   db.doc("meta/watch").onSnapshot((d) => { state.watch = d.exists ? d.data() : {}; safeRender(); });
   await store.start();
   if (!navigator.onLine && !store.hasCache()) { state.noDb = true; render(); }
+  setTimeout(autoLocateShops, 4000);
 }
 const clean = (doc) => ({ ...doc.data(), id: doc.id });
 window.jarvisState = state;
